@@ -1,138 +1,141 @@
-# 🏭 CoCo Hackathon - AI Industrial Command Center
+# Plant Sentinel
 
-An AI-driven Manufacturing Intelligence & Operational Command Center built for industrial enterprises. The platform integrates real-time fleet telematics, predictive maintenance, supply chain risk forecasting, order impact analysis, and an interactive Gemini Copilot for intelligent plant operations.
+**Snowflake-native Predictive Maintenance & OEE Command Center**
 
----
+Built for the Snowflake CoCo CLI Hackathon 2026, GCC Edition.
 
-## ✨ Features
-
-- 📊 **Executive Hero & Operational Status Briefing**:
-  - Real-time fleet metrics (OEE, Total Factories, Connected Assets, Active Alerts, Fleet Health).
-  - AI-generated voice & text briefings with cost avoidance insights and automated report generation.
-- ⚡ **Copilot Command Center & AI Intelligence**:
-  - Gemini-powered interactive assistant capable of answering complex operational queries, retrieving data specs, and recommending proactive interventions.
-- 🚚 **Supply Chain Risk Forecasting**:
-  - Live tracking of critical component suppliers, supplier health scores, lead time variance, and affected machines.
-- 📦 **Order Impact Analysis**:
-  - Relational mapping of customer order commitments against manufacturing line availability and revenue exposure.
-- ⚙️ **Synthetic Industrial Data Engine**:
-  - High-fidelity Python generator for multi-plant master data, line telemetry, maintenance logs, and supply chain records.
+From alert to approved action to verified recovery — predict failures, open incidents, compare options on safety/cost/production, let a human approve, execute, verify recovery, return to guard mode. All data stays inside Snowflake.
 
 ---
 
-## 🛠️ Technology Stack
-
-### **Frontend**
-- **Framework**: [Next.js 15](https://nextjs.org/) (App Router & React 19)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) with smooth modern UI aesthetics & custom animations
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **AI Integration**: [`@google/genai`](https://www.npmjs.com/package/@google/genai) SDK
-
-### **Backend & Data Pipeline**
-- **Language**: Python 3.10+
-- **Data Engineering**: `pandas`, `numpy`, `faker`
-- **Output**: Relational CSV data schemas covering plants, lines, equipment, maintenance, and order fulfillment.
-
----
-
-## 📂 Repository Structure
+## Architecture
 
 ```
-coco-hackathon/
-├── Frontend/                 # Next.js 15 Web Application
-│   ├── app/                  # App Router pages & API routes (/api/copilot)
-│   ├── components/           # UI Components (HeroBriefing, SupplyChainRisk, OrderImpact, Copilot)
-│   ├── public/               # Static assets & icons
-│   ├── package.json          # Dependencies & scripts
-│   └── .env.local            # Local environment configuration
-├── csv_data/                 # Generated CSV datasets for industrial metrics
-├── data_generation.py        # Python script to generate synthetic industrial data
-├── .gitignore                # Root gitignore rules
-└── README.md                 # Project documentation
+csv_data_v2/  (48 CSVs, 253K rows, 45-day window)
+      |
+      v
+Snowflake PDM database
+  RAW       -- 48 ingested tables
+  CORE      -- 8 Dynamic Tables (dims + facts)
+  ANALYTICS -- 2 DTs (OEE, sensor features) + 5 views
+  ML        -- Feature engineering, model, scoring
+  APP       -- Incidents, options, actions, config
+  SEARCH    -- Cortex Search services
+      |
+      v
+FastAPI Backend (Backend/)
+  19 route modules, Pydantic models, SSE streaming
+  Cortex Agent proxy for copilot/intelligence
+      |
+      v
+Next.js 15 Frontend (Frontend/)
+  React 19, Tailwind CSS v4, polling APIs
+  Dashboard, Maintenance, Asset 360, Incident Room
 ```
 
----
+## Key Features
 
-## 🚀 Getting Started
+- **OEE Command Center** — Availability x Performance x Quality per line/shift, aggregated by plant
+- **Predictive Maintenance** — Rolling sensor features (1h/4h/24h vibration, temperature, kurtosis), ML scoring, RUL estimation
+- **Incident Lifecycle** — WATCH > DETECTED > ASSESSING > AWAITING_DECISION > EXECUTING > RECOVERING > RESOLVED > WATCH
+- **Options Engine** — Score maintenance options across 9 criteria (safety, cost, production, customer impact, people, parts, quality, compliance, confidence)
+- **Cortex Intelligence** — Copilot powered by Snowflake Cortex Agent with search services over maintenance docs and operator notes
+- **Real-time Data Flow** — Dynamic Tables with 1-hour lag, frontend polling at 5-15s intervals
+
+## CoCo CLI Skills
+
+Three modular skills in `.cortex/skills/`:
+
+| Skill | Purpose |
+|-------|---------|
+| `$pdm-detect` | Score assets, raise alerts, open incident |
+| `$pdm-assess-options` | Generate and rank maintenance options with evidence |
+| `$pdm-execute-recover` | Execute approved option, verify recovery |
+
+## Data
+
+- **3 plants**: Pune, Chennai, Coimbatore (India)
+- **50 assets** (16 monitored): CNC machines, robots, pumps, conveyors
+- **11 production lines** across 3 plants
+- **48 CSV tables**: sensor readings, machine states, work orders, job execution, customer orders, spare parts, operator assignments, electrical metering, maintenance docs, and more
+- **Currency**: INR
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Database | Snowflake (Dynamic Tables, Cortex Search, Cortex Agent, Semantic Views) |
+| Backend | Python, FastAPI, snowflake-connector-python, SSE |
+| Frontend | Next.js 15, React 19, Tailwind CSS v4, Lucide, Motion |
+| ML | Snowpark ML (feature engineering, training, scoring) |
+| CLI | Snowflake CoCo CLI with 3 custom skills |
+
+## Getting Started
 
 ### Prerequisites
-- **Node.js**: `v18.17+` or `v20+`
-- **npm** / **yarn** / **pnpm**
-- **Python**: `3.9+` (for data generation)
 
----
+- Node.js 18.17+
+- Python 3.10+
+- Snowflake account with Cortex features enabled
+- Snowflake CoCo CLI
 
-### 1. Frontend Setup
+### 1. Snowflake Setup
 
-1. **Navigate to the Frontend directory**:
-   ```bash
-   cd Frontend
-   ```
+Load the 48 CSV files into Snowflake and create the Dynamic Tables and views. The database is `PDM` with schemas RAW, CORE, ANALYTICS, ML, APP, SEARCH.
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+### 2. Backend
 
-3. **Configure Environment Variables**:
-   Create a `.env.local` file inside the `Frontend` directory:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-
-4. **Run the Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser to view the Command Center.
-
----
-
-### 2. Data Generation (Optional)
-
-To regenerate the industrial CSV datasets:
-
-1. Create and activate a Python virtual environment:
-   ```bash
-   python -m venv .venv
-   # Windows:
-   .venv\Scripts\activate
-   # macOS/Linux:
-   source .venv/bin/activate
-   ```
-
-2. Install required packages:
-   ```bash
-   pip install pandas numpy faker
-   ```
-
-3. Run the generator script:
-   ```bash
-   python data_generation.py
-   ```
-   *Generated datasets will be saved into the `csv_data/` directory.*
-
----
-
-## 📜 Available Scripts
-
-In `Frontend/`:
-
-| Command | Description |
-| :--- | :--- |
-| `npm run dev` | Launches Next.js dev server with hot-reload at `http://localhost:3000` |
-| `npm run build` | Compiles and builds the production app |
-| `npm run start` | Starts the production server |
-| `npm run lint` | Runs ESLint check |
-
----
-
-## 🤝 Contributing & Git Workflow
-
-Before pushing to GitHub:
 ```bash
-git add .
-git commit -m "feat: complete command center dashboard with AI copilot & data engine"
-git push origin main
+cd Backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
+
+Uses `externalbrowser` auth by default. Configure via environment variables or `Backend/.env.example`.
+
+### 3. Frontend
+
+```bash
+cd Frontend
+npm install
+```
+
+Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local` (defaults to `http://localhost:8000`).
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Snowflake Objects
+
+| Schema | Objects |
+|--------|---------|
+| RAW | 48 tables (loaded from CSV) |
+| CORE | DIM_SITE, DIM_LINE, DIM_ASSET, DIM_PRODUCT, FACT_SENSOR_COMBINED, FACT_MACHINE_STATE, FACT_JOB_EXECUTION, FACT_WORK_ORDER |
+| ANALYTICS | DT_OEE_LINE_SHIFT, DT_ASSET_FEATURES, VW_KPI_SUMMARY, VW_ACTIVE_ALERTS, VW_ORDERS_AT_RISK, VW_PART_GAP, VW_PLANT_HEALTH |
+| ML | Feature store, trained model, scoring procedure |
+| APP | INCIDENTS, INCIDENT_OPTIONS, INCIDENT_ACTIONS, WATCH_STATE, SCENARIOS, CFG_POLICY |
+| SEARCH | CSS_DOCS, CSS_NOTES (Cortex Search over maintenance documents and operator notes) |
+
+## API Endpoints
+
+The backend exposes 25+ endpoints under `/api/`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/api/kpis` | KPI summary (OEE, alerts, breakdown hours, cost) |
+| `/api/plants` | Plant health overview |
+| `/api/alerts` | Active machine alerts with sensor readings |
+| `/api/orders` | Orders at risk with revenue exposure |
+| `/api/maintenance/queue` | Ranked maintenance queue |
+| `/api/maintenance/readiness` | Work order bucket counts |
+| `/api/assets/{id}` | Asset 360 detail with sensor time series |
+| `/api/production` | Daily actual vs plan |
+| `/api/energy` | Per-plant power consumption |
+| `/api/technicians` | Workforce availability |
+| `/api/activity-stream` | Live event stream |
+| `/api/copilot/chat` | Cortex Agent intelligence proxy |
+| `/api/incidents` | Incident lifecycle CRUD + SSE |
+| `/api/simulator` | Scenario control |
+
+---
+
+Snowflake CoCo CLI Hackathon 2026, GCC Edition

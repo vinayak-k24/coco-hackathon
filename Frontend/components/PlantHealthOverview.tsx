@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronRight,
   TrendingUp,
@@ -17,6 +17,7 @@ import {
   AlertOctagon,
 } from 'lucide-react';
 import Image from 'next/image';
+import { fetchApi } from '@/lib/api';
 
 export interface FactoryPlant {
   id: string;
@@ -39,88 +40,8 @@ export interface FactoryPlant {
   annualRevenue: string;
 }
 
-export const FACTORIES: FactoryPlant[] = [
-  {
-    id: 'berlin',
-    name: 'Berlin, Germany',
-    specialty: 'Automotive Components',
-    country: 'Germany',
-    image: 'https://picsum.photos/seed/berlin-factory/400/300',
-    health: 98,
-    change: '2%',
-    isNegative: false,
-    critical: 2,
-    warning: 4,
-    online: 94,
-    manager: 'Hans Weber',
-    lines: 7,
-    oee: 94,
-    workforce: 216,
-    assets: 312,
-    readinessRUL: '$48.2M',
-    annualRevenue: '$52.1M',
-  },
-  {
-    id: 'chicago',
-    name: 'Chicago, USA',
-    specialty: 'Industrial Machinery',
-    country: 'USA',
-    image: 'https://picsum.photos/seed/chicago-factory/400/300',
-    health: 92,
-    change: '4%',
-    isNegative: false,
-    critical: 1,
-    warning: 3,
-    online: 91,
-    manager: 'Sarah Jenkins',
-    lines: 8,
-    oee: 91,
-    workforce: 248,
-    assets: 296,
-    readinessRUL: '$36.4M',
-    annualRevenue: '$52.1M',
-  },
-  {
-    id: 'monterrey',
-    name: 'Monterrey, Mexico',
-    specialty: 'Electronics',
-    country: 'Mexico',
-    image: 'https://picsum.photos/seed/monterrey-factory/400/300',
-    health: 88,
-    change: '1%',
-    isNegative: true,
-    critical: 1,
-    warning: 5,
-    online: 87,
-    manager: 'Carlos Mendez',
-    lines: 6,
-    oee: 87,
-    workforce: 192,
-    assets: 276,
-    readinessRUL: '$35.4M',
-    annualRevenue: '$36.4M',
-  },
-  {
-    id: 'singapore',
-    name: 'Singapore',
-    specialty: 'Precision Manufacturing',
-    country: 'Singapore',
-    image: 'https://picsum.photos/seed/singapore-factory/400/300',
-    health: 95,
-    change: '3%',
-    isNegative: false,
-    critical: 0,
-    warning: 2,
-    online: 93,
-    manager: 'Li Wei Chen',
-    lines: 10,
-    oee: 93,
-    workforce: 236,
-    assets: 362,
-    readinessRUL: '$61.7M',
-    annualRevenue: '$61.7M',
-  },
-];
+// Keep as fallback while API loads
+export let FACTORIES: FactoryPlant[] = [];
 
 interface PlantHealthOverviewProps {
   onSelectFactory: (factory: FactoryPlant) => void;
@@ -128,10 +49,22 @@ interface PlantHealthOverviewProps {
 
 export default function PlantHealthOverview({ onSelectFactory }: PlantHealthOverviewProps) {
   const [viewMode, setViewMode] = useState<'map' | 'grid' | 'list'>('grid');
+  const [plants, setPlants] = useState<FactoryPlant[]>([]);
 
-  const totalFactories = FACTORIES.length;
-  const totalAssets = FACTORIES.reduce((sum, f) => sum + f.assets, 0).toLocaleString();
-  const totalWorkforce = FACTORIES.reduce((sum, f) => sum + f.workforce, 0).toLocaleString();
+  useEffect(() => {
+    const load = () => fetchApi<FactoryPlant[]>('/api/plants', []).then((data) => {
+      setPlants(data);
+      FACTORIES = data;
+    });
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayPlants = plants.length > 0 ? plants : FACTORIES;
+  const totalFactories = displayPlants.length;
+  const totalAssets = displayPlants.reduce((sum, f) => sum + f.assets, 0).toLocaleString();
+  const totalWorkforce = displayPlants.reduce((sum, f) => sum + f.workforce, 0).toLocaleString();
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs">
@@ -181,9 +114,9 @@ export default function PlantHealthOverview({ onSelectFactory }: PlantHealthOver
         </div>
       </div>
 
-      {/* 4 Factory Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {FACTORIES.map((factory) => {
+      {/* Factory Cards Grid */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${displayPlants.length <= 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+        {displayPlants.map((factory) => {
           const isRed = factory.health < 80;
           const isGood = factory.health >= 90;
 

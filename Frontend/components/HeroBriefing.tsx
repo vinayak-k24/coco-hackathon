@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sparkles,
   Play,
@@ -17,6 +17,23 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import Image from 'next/image';
+import { fetchApi } from '@/lib/api';
+
+interface HeroBriefingData {
+  greeting: string;
+  user_name: string;
+  date: string;
+  summary: string;
+  oee_avg: string;
+  cost_avoidance: string;
+  total_factories: number;
+  connected_assets: number;
+  workforce_online: number;
+  workforce_pct: string;
+  platform_health: string;
+  plant_badges: { name: string; health_pct: number }[];
+  ai_briefing_text: string;
+}
 
 interface HeroBriefingProps {
   onViewDetails: () => void;
@@ -29,14 +46,29 @@ export default function HeroBriefing({
   onListenBrief,
   isPlayingBrief = false,
 }: HeroBriefingProps) {
+  const [data, setData] = useState<HeroBriefingData | null>(null);
+
+  useEffect(() => {
+    fetchApi<HeroBriefingData>('/api/hero-briefing').then(setData).catch(() => {});
+  }, []);
+
+  const d = data;
+  const factories = d?.total_factories ?? 3;
+  const assets = d?.connected_assets ?? 50;
+  const workforce = d?.workforce_online ?? 0;
+  const workforcePct = d?.workforce_pct ?? '0%';
+  const platformHealth = d?.platform_health ?? '0%';
+  const oee = d?.oee_avg ?? '—';
+  const costAvoidance = d?.cost_avoidance ?? '₹0';
+  const badges = d?.plant_badges ?? [];
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch mb-6">
       {/* Left Column: Greeting & Summary Statement */}
       <div className="xl:col-span-4 flex flex-col justify-center">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5">
-          <span className="text-amber-500 text-sm">☀️</span> Good Morning, Alex ×
+          <span className="text-amber-500 text-sm">☀️</span> {d?.greeting ?? 'Good Morning'}, {d?.user_name ?? 'Operator'} ×
           <span className="text-slate-400 ml-1">
-            Tue, 12 Nov 2024
+            {d?.date ?? ''}
           </span>
         </div>
 
@@ -75,10 +107,10 @@ export default function HeroBriefing({
 
           <p className="text-xs text-slate-700 leading-relaxed">
             All factories are operating above plan with{' '}
-            <span className="font-semibold text-slate-900">92% average OEE</span>. Two supply chain risks
+            <span className="font-semibold text-slate-900">{oee} average OEE</span>. Two supply chain risks
             require attention, but no customer
             commitments are at risk. Expected{' '}
-            <span className="font-semibold text-emerald-700">$1.2M</span>{' '}
+            <span className="font-semibold text-emerald-700">{costAvoidance}</span>{' '}
             cost avoidance from active AI
             recommendations this month.
           </p>
@@ -138,18 +170,12 @@ export default function HeroBriefing({
 
           {/* Floating location badges */}
           <div className="relative z-10 space-y-1">
-            <div className="bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[9px] font-semibold text-slate-800 shadow-sm border border-white/60 flex items-center gap-1">
-              <span className="text-emerald-500">Berlin</span>
-              <span className="font-bold text-emerald-600">99%</span>
-            </div>
-            <div className="bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[9px] font-semibold text-slate-800 shadow-sm border border-white/60 flex items-center gap-1">
-              <span className="text-blue-500">Monterrey</span>
-              <span className="font-bold text-blue-600">88%</span>
-            </div>
-            <div className="bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[9px] font-semibold text-slate-800 shadow-sm border border-white/60 flex items-center gap-1">
-              <span className="text-teal-500">Singapore</span>
-              <span className="font-bold text-teal-600">96%</span>
-            </div>
+            {badges.map((b, i) => (
+              <div key={i} className="bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-md text-[9px] font-semibold text-slate-800 shadow-sm border border-white/60 flex items-center gap-1">
+                <span className={i === 0 ? 'text-emerald-500' : i === 1 ? 'text-blue-500' : 'text-teal-500'}>{b.name}</span>
+                <span className={`font-bold ${i === 0 ? 'text-emerald-600' : i === 1 ? 'text-blue-600' : 'text-teal-600'}`}>{b.health_pct}%</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -171,14 +197,14 @@ export default function HeroBriefing({
               <Factory className="w-4 h-4 text-slate-400" />
               <span className="text-xs text-slate-600">Total Factories</span>
             </div>
-            <span className="text-sm font-bold text-slate-900">4</span>
+            <span className="text-sm font-bold text-slate-900">{factories}</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-slate-400" />
               <span className="text-xs text-slate-600">Connected Assets</span>
             </div>
-            <span className="text-sm font-bold text-slate-900">1,248</span>
+            <span className="text-sm font-bold text-slate-900">{assets.toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -186,8 +212,8 @@ export default function HeroBriefing({
               <span className="text-xs text-slate-600">Workforce Online</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-900">892</span>
-              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">96%</span>
+              <span className="text-sm font-bold text-slate-900">{workforce}</span>
+              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{workforcePct}</span>
             </div>
           </div>
           <div className="flex items-center justify-between py-2">
@@ -196,7 +222,7 @@ export default function HeroBriefing({
               <span className="text-xs text-slate-600">Platform Health</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-900">98%</span>
+              <span className="text-sm font-bold text-slate-900">{platformHealth}</span>
             </div>
           </div>
         </div>

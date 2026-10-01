@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, Package, AlertTriangle } from 'lucide-react';
+import { fetchApi } from '@/lib/api';
 
 interface OrderImpactAnalysisCardProps {
   onSelectOrder?: (orderId: string) => void;
@@ -16,54 +17,6 @@ interface OrderRow {
   status: 'At Risk' | 'On Track' | 'Watch';
   revenueExposure: string;
 }
-
-const ORDERS: OrderRow[] = [
-  {
-    customer: 'BMW',
-    customerLogo: '🔵',
-    orderId: 'PO-44821',
-    product: 'Brake Assembly',
-    commitment: 'Nov 18, 2024',
-    status: 'At Risk',
-    revenueExposure: '$1.2M',
-  },
-  {
-    customer: 'CAT',
-    customerLogo: '🟡',
-    orderId: 'PO-77182',
-    product: 'Hydraulic Valve',
-    commitment: 'Nov 22, 2024',
-    status: 'At Risk',
-    revenueExposure: '$680K',
-  },
-  {
-    customer: 'Tesla',
-    customerLogo: '🔴',
-    orderId: 'PO-55219',
-    product: 'Motor Housing',
-    commitment: 'Nov 25, 2024',
-    status: 'On Track',
-    revenueExposure: '$0',
-  },
-  {
-    customer: 'Siemens',
-    customerLogo: '🟢',
-    orderId: 'PO-89321',
-    product: 'Control Module',
-    commitment: 'Nov 28, 2024',
-    status: 'Watch',
-    revenueExposure: '$430K',
-  },
-  {
-    customer: 'John Deere',
-    customerLogo: '🟤',
-    orderId: 'PO-67014',
-    product: 'Gear Assembly',
-    commitment: 'Dec 2, 2024',
-    status: 'On Track',
-    revenueExposure: '$0',
-  },
-];
 
 const statusConfig = {
   'At Risk': {
@@ -88,15 +41,23 @@ const statusConfig = {
 
 export default function OrderImpactAnalysisCard({ onSelectOrder }: OrderImpactAnalysisCardProps) {
   const [filter, setFilter] = useState('All Orders');
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+
+  useEffect(() => {
+    const load = () => fetchApi<OrderRow[]>('/api/orders', []).then(setOrders);
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredOrders =
     filter === 'All Orders'
-      ? ORDERS
+      ? orders
       : filter === 'At Risk'
-      ? ORDERS.filter((o) => o.status === 'At Risk')
+      ? orders.filter((o) => o.status === 'At Risk')
       : filter === 'Watch'
-      ? ORDERS.filter((o) => o.status === 'Watch' || o.status === 'At Risk')
-      : ORDERS;
+      ? orders.filter((o) => o.status === 'Watch' || o.status === 'At Risk')
+      : orders;
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
