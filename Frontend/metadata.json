@@ -1,0 +1,6 @@
+{
+  "name": "NexaFactory",
+  "description": "Next-generation intelligent manufacturing operations command center with AI copilot, real-time plant telemetry, and predictive maintenance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
