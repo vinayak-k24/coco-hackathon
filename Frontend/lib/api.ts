@@ -1,5 +1,4 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 export async function fetchApi<T>(
   path: string,
@@ -24,8 +23,9 @@ export async function fetchApi<T>(
 }
 
 export function formatINR(val: number): string {
-  if (val >= 1_00_00_000) return `₹${(val / 1_00_00_000).toFixed(1)} Cr`;
-  if (val >= 1_00_000) return `₹${(val / 1_00_000).toFixed(1)}L`;
-  if (val >= 1_000) return `₹${(val / 1_000).toFixed(0)}K`;
-  return `₹${val.toFixed(0)}`;
+  const v = Number(val) || 0;
+  if (v >= 1_00_00_000) return `₹${(v / 1_00_00_000).toFixed(1)} Cr`;
+  if (v >= 1_00_000) return `₹${(v / 1_00_000).toFixed(1)}L`;
+  if (v >= 1_000) return `₹${(v / 1_000).toFixed(0)}K`;
+  return `₹${v.toFixed(0)}`;
 }

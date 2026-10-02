@@ -1,126 +1,91 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, Package, AlertTriangle } from 'lucide-react';
+import { LayoutGrid, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { fetchApi } from '@/lib/api';
+import { SAMPLE_ORDERS, type OrderImpactRow } from '@/lib/sample-data';
 
-interface OrderImpactAnalysisCardProps {
-  onSelectOrder?: (orderId: string) => void;
-}
+interface Props { onSelectOrder?: (orderId: string) => void }
 
-interface OrderRow {
-  customer: string;
-  customerLogo: string;
-  orderId: string;
-  product: string;
-  commitment: string;
-  status: 'At Risk' | 'On Track' | 'Watch';
-  revenueExposure: string;
-}
-
-const statusConfig = {
-  'At Risk': {
-    bg: 'bg-rose-50',
-    text: 'text-rose-700',
-    border: 'border-rose-200/60',
-    dot: 'bg-rose-500',
-  },
-  'On Track': {
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200/60',
-    dot: 'bg-emerald-500',
-  },
-  Watch: {
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-200/60',
-    dot: 'bg-amber-500',
-  },
+const statusCfg: Record<string, { bg: string; text: string; Icon: React.ComponentType<{ style?: React.CSSProperties }> }> = {
+  'At Risk': { bg: '#FFF0F1', text: '#FF4D5A', Icon: AlertCircle },
+  'Watch': { bg: '#FFF7E8', text: '#B45309', Icon: AlertTriangle },
+  'On Track': { bg: '#EAF9F2', text: '#18B276', Icon: CheckCircle2 },
 };
 
-export default function OrderImpactAnalysisCard({ onSelectOrder }: OrderImpactAnalysisCardProps) {
-  const [filter, setFilter] = useState('All Orders');
-  const [orders, setOrders] = useState<OrderRow[]>([]);
+export default function OrderImpactAnalysisCard({ onSelectOrder }: Props) {
+  const [orders, setOrders] = useState<OrderImpactRow[]>([]);
 
   useEffect(() => {
-    const load = () => fetchApi<OrderRow[]>('/api/orders', []).then(setOrders);
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
+    fetchApi<Record<string, string>[]>('/api/orders', []).then(data => {
+      if (data.length > 0) {
+        setOrders(data.slice(0, 5).map(d => ({
+          customer: d.customer || '',
+          logo: (d.customer || 'X')[0],
+          orderId: d.orderId || '',
+          product: d.product || '',
+          commitment: d.commitment || '',
+          status: (d.status as OrderImpactRow['status']) || 'On Track',
+          revenueExposure: d.revenueExposure || '$0',
+        })));
+      } else {
+        setOrders(SAMPLE_ORDERS);
+      }
+    });
   }, []);
 
-  const filteredOrders =
-    filter === 'All Orders'
-      ? orders
-      : filter === 'At Risk'
-      ? orders.filter((o) => o.status === 'At Risk')
-      : filter === 'Watch'
-      ? orders.filter((o) => o.status === 'Watch' || o.status === 'At Risk')
-      : orders;
+  const rows = orders.length > 0 ? orders : SAMPLE_ORDERS;
 
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+    <div style={{ height: 278, background: '#FFF', border: '1px solid #E2EBF2', borderRadius: 11, boxShadow: '0 2px 10px rgba(23,43,77,0.05)', padding: '12px 14px', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between" style={{ height: 30, marginBottom: 8 }}>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-            <Package className="w-4 h-4 text-indigo-600" />
+          <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 8, background: '#EEF6FF', border: '1px solid #DCEBFA' }}>
+            <LayoutGrid style={{ width: 16, height: 16, color: '#1677E8' }} />
           </div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight">Order Impact</h2>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#172B4D' }}>Order Impact</span>
         </div>
-        <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer">
-          View All →
-        </button>
+        <button className="flex items-center gap-0.5 cursor-pointer" style={{ fontSize: 8, fontWeight: 600, color: '#1677E8' }}>View All <ChevronRight style={{ width: 10, height: 10 }} /></button>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider border-b border-slate-100">
-              <th className="text-left pb-2 pl-1 font-semibold">Customer / Order</th>
-              <th className="text-left pb-2 font-semibold">Product</th>
-              <th className="text-left pb-2 font-semibold">Commitment</th>
-              <th className="text-left pb-2 font-semibold">Status</th>
-              <th className="text-right pb-2 pr-1 font-semibold">Revenue Exposure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map((order) => {
-              const config = statusConfig[order.status];
-              return (
-                <tr
-                  key={order.orderId}
-                  onClick={() => onSelectOrder?.(order.orderId)}
-                  className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
-                >
-                  <td className="py-2.5 pl-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{order.customerLogo}</span>
-                      <div>
-                        <span className="font-bold text-slate-900 block">{order.customer}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">{order.orderId}</span>
-                      </div>
+      <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {['Customer / Order', 'Product', 'Commitment', 'Status', 'Revenue Exposure'].map(h => (
+              <th key={h} style={{ fontSize: 8, fontWeight: 600, color: '#8495A7', textAlign: 'left', padding: '0 4px 6px', borderBottom: '1px solid #E7EEF4', whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(o => {
+            const sc = statusCfg[o.status] || statusCfg['On Track'];
+            const StatusIcon = sc.Icon;
+            return (
+              <tr key={o.orderId} onClick={() => onSelectOrder?.(o.orderId)} className="cursor-pointer hover:bg-[#F8FBFE]" style={{ borderBottom: '1px solid #F0F4F8' }}>
+                <td style={{ padding: '6px 4px' }}>
+                  <div className="flex items-center gap-2">
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#F0F4F8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#52677D', flexShrink: 0 }}>{o.logo}</div>
+                    <div>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: '#172B4D', display: 'block', lineHeight: 1.2 }}>{o.customer}</span>
+                      <span style={{ fontSize: 7, fontWeight: 500, color: '#8495A7' }}>{o.orderId}</span>
                     </div>
-                  </td>
-                  <td className="py-2.5 text-slate-700">{order.product}</td>
-                  <td className="py-2.5 text-slate-500">{order.commitment}</td>
-                  <td className="py-2.5">
-                    <span
-                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border ${config.bg} ${config.text} ${config.border}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-2.5 pr-1 text-right font-bold text-slate-900">{order.revenueExposure}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                </td>
+                <td style={{ padding: '6px 4px', fontSize: 9, fontWeight: 500, color: '#52677D' }}>{o.product}</td>
+                <td style={{ padding: '6px 4px', fontSize: 8, fontWeight: 500, color: '#8495A7' }}>{o.commitment}</td>
+                <td style={{ padding: '6px 4px' }}>
+                  <span style={{ fontSize: 8, fontWeight: 600, padding: '2px 7px', borderRadius: 10, background: sc.bg, color: sc.text, display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' }}>
+                    <StatusIcon style={{ width: 9, height: 9 }} />{o.status}
+                  </span>
+                </td>
+                <td style={{ padding: '6px 4px', fontSize: 10, fontWeight: 700, color: '#172B4D', textAlign: 'right' }}>{o.revenueExposure}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

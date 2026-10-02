@@ -1,106 +1,86 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Cpu, Layers, Disc3, Settings2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
-import { fetchApi } from '@/lib/api';
+import { Package, ChevronRight } from 'lucide-react';
+import { SAMPLE_SUPPLIERS, type SupplierRisk } from '@/lib/sample-data';
 
-interface SupplyChainRiskItem {
-  name: string;
-  sub: string;
-  supplierHealth: number;
-  leadTime: string;
-  leadTimeChange: string;
-  affectedMachines: number;
-  businessExposure: string;
-  risk: string;
+interface Props { onViewAll: () => void }
+
+const riskCfg = {
+  Low: { bg: '#EAF9F2', text: '#18B276' },
+  Medium: { bg: '#FFF7E8', text: '#F2A51A' },
+  High: { bg: '#FFF0F1', text: '#FF4D5A' },
+};
+
+function Spark({ data, color, w = 55, h = 22 }: { data: number[]; color: string; w?: number; h?: number }) {
+  if (data.length < 2) return null;
+  const mn = Math.min(...data), mx = Math.max(...data), rng = mx - mn || 1;
+  const step = w / (data.length - 1);
+  const pts = data.map((v, i) => `${i * step},${h - ((v - mn) / rng) * (h - 4) - 2}`).join(' ');
+  return <svg width={w} height={h}><polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-interface SupplyChainRiskCardProps {
-  onViewAll: () => void;
-}
-
-export default function SupplyChainRiskCard({ onViewAll }: SupplyChainRiskCardProps) {
-  const [items, setItems] = useState<SupplyChainRiskItem[]>([]);
-
-  useEffect(() => {
-    const load = () => fetchApi<SupplyChainRiskItem[]>('/api/supply-chain/risk', []).then(setItems);
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const iconForIndex = [Settings2, Disc3, Cpu, Layers];
-  const iconClassForRisk: Record<string, string> = {
-    'High Risk': 'bg-rose-50 text-rose-600 border-rose-100',
-    'Medium Risk': 'bg-amber-50 text-amber-600 border-amber-100',
-    'Low Risk': 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    'Critical': 'bg-red-50 text-red-600 border-red-100',
-  };
-  const badgeClassForRisk: Record<string, string> = {
-    'High Risk': 'bg-rose-50 text-rose-700 border-rose-200/60',
-    'Medium Risk': 'bg-amber-50 text-amber-700 border-amber-200/60',
-    'Low Risk': 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
-    'Critical': 'bg-red-50 text-red-700 border-red-200/60',
-  };
-
+function SupplierCard({ s }: { s: SupplierRisk }) {
+  const rc = riskCfg[s.risk];
+  const sparkColor = s.risk === 'High' ? '#FF4D5A' : s.risk === 'Medium' ? '#F2A51A' : '#18B276';
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-          </div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight">Supply Chain Risk</h2>
+    <div className="flex flex-col shrink-0" style={{ flex: '1 1 0', minWidth: 140, maxWidth: 200, border: '1px solid #E2EBF2', borderRadius: 9, padding: '8px 9px', background: '#FFF' }}>
+      <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 6, background: '#F4F8FC', border: '1px solid #E2EBF2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Package style={{ width: 14, height: 14, color: '#8495A7' }} />
         </div>
-        <button onClick={onViewAll} className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer">View All →</button>
+        <div className="min-w-0">
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#172B4D', display: 'block', lineHeight: 1.2 }} className="truncate">{s.product}</span>
+          <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7' }}>{s.supplier}</span>
+        </div>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {items.map((item, idx) => {
-          const Icon = iconForIndex[idx % iconForIndex.length];
-          const healthColor = item.supplierHealth >= 85 ? 'text-emerald-600' : item.supplierHealth >= 70 ? 'text-amber-600' : 'text-red-600';
-          const barColor = item.supplierHealth >= 85 ? 'bg-emerald-500' : item.supplierHealth >= 70 ? 'bg-amber-500' : 'bg-red-500';
-          return (
-            <div key={idx} className="rounded-xl border border-slate-200/90 p-3 hover:shadow-sm transition-all cursor-pointer bg-gradient-to-b from-white to-slate-50/30">
-              <div className="flex items-start gap-2 mb-2.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${iconClassForRisk[item.risk] || 'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
-                  <p className="text-[10px] text-slate-500">{item.sub}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-slate-400">Supplier Health</span>
-                <span className={`text-xs font-bold ${healthColor}`}>{item.supplierHealth}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mb-2.5 overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${item.supplierHealth}%` }} />
-              </div>
-              <div className="space-y-1.5 text-[10px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Lead Time</span>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{item.leadTime}</span>
-                    {item.leadTimeChange && <span className="font-bold text-red-600">{item.leadTimeChange}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Affected Machines</span>
-                  <span className="font-semibold text-slate-700">{item.affectedMachines}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Business Exposure</span>
-                  <span className="font-bold text-slate-900">{item.businessExposure}</span>
-                </div>
-              </div>
-              <div className="mt-2.5">
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border block text-center ${badgeClassForRisk[item.risk] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>{item.risk}</span>
-              </div>
-            </div>
-          );
-        })}
-        {items.length === 0 && <p className="text-xs text-slate-400 col-span-4 text-center py-4">Loading supply chain data...</p>}
+      <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+        <div>
+          <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', display: 'block' }}>Supplier Health</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#203852' }}>{s.healthPct}%</span>
+        </div>
+        <Spark data={s.healthHistory} color={sparkColor} />
+      </div>
+      <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+        <div>
+          <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', display: 'block' }}>Lead Time</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#344B63' }}>{s.leadTime}</span>
+        </div>
+        {s.leadTimeTrend && <span style={{ fontSize: 8, fontWeight: 600, color: '#FF4D5A' }}>{s.leadTimeTrend}</span>}
+      </div>
+      <div className="flex gap-3" style={{ marginBottom: 4 }}>
+        <div>
+          <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', display: 'block' }}>Affected Machines</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#344B63' }}>{s.affectedMachines}</span>
+        </div>
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', display: 'block' }}>Business Exposure</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#344B63' }}>{s.businessExposure}</span>
+      </div>
+      <div className="mt-auto">
+        <span style={{ fontSize: 8, fontWeight: 600, padding: '3px 8px', borderRadius: 8, background: rc.bg, color: rc.text, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: rc.text }} />
+          {s.risk} Risk
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function SupplyChainRiskCard({ onViewAll }: Props) {
+  return (
+    <div style={{ height: 278, background: '#FFF', border: '1px solid #E2EBF2', borderRadius: 11, boxShadow: '0 2px 10px rgba(23,43,77,0.05)', padding: '12px 14px', overflow: 'hidden', boxSizing: 'border-box' }}>
+      <div className="flex items-center justify-between" style={{ height: 30, marginBottom: 8 }}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 8, background: '#EEF6FF', border: '1px solid #DCEBFA' }}>
+            <Package style={{ width: 16, height: 16, color: '#1677E8' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#172B4D' }}>Supply Chain Risk</span>
+        </div>
+        <button onClick={onViewAll} className="flex items-center gap-0.5 cursor-pointer" style={{ fontSize: 8, fontWeight: 600, color: '#1677E8' }}>View All <ChevronRight style={{ width: 10, height: 10 }} /></button>
+      </div>
+      <div className="flex gap-2.5" style={{ height: 218, overflow: 'hidden' }}>
+        {SAMPLE_SUPPLIERS.map(s => <SupplierCard key={s.id} s={s} />)}
       </div>
     </div>
   );

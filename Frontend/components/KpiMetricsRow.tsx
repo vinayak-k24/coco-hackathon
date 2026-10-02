@@ -3,23 +3,12 @@
 import { useState, useEffect } from 'react';
 import {
   AlertOctagon,
-  PieChart,
   Clock,
   DollarSign,
   FileSpreadsheet,
-  Activity,
   TrendingUp,
-  ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
-  ShieldCheck,
-  Zap,
 } from 'lucide-react';
 import { fetchApi, formatINR } from '@/lib/api';
-
-interface KpiMetricsRowProps {
-  onCardClick: (cardId: string) => void;
-}
 
 interface KpiData {
   alerts_active: number;
@@ -33,17 +22,73 @@ interface KpiData {
   predicted_cost_avoidance_inr: number;
 }
 
-const ICON_CONFIG = [
-  { id: 'open-alerts', icon: AlertOctagon, iconBg: 'bg-red-50 text-red-600 border-red-100', label: 'Open Alerts', key: 'alerts_active' as const },
-  { id: 'plant-oee', icon: PieChart, iconBg: 'bg-teal-50 text-teal-600 border-teal-100', label: 'Plant OEE', key: 'oee_avg' as const, suffix: '%' },
-  { id: 'breakdown-hours', icon: Clock, iconBg: 'bg-blue-50 text-blue-600 border-blue-100', label: 'Breakdown Hours', key: 'breakdown_hours' as const },
-  { id: 'breakdown-cost', icon: DollarSign, iconBg: 'bg-purple-50 text-purple-600 border-purple-100', label: 'Breakdown Cost', key: 'breakdown_cost_inr' as const, isINR: true },
-  { id: 'orders-at-risk', icon: FileSpreadsheet, iconBg: 'bg-amber-50 text-amber-600 border-amber-100', label: 'Orders at Risk', key: 'orders_at_risk' as const },
-  { id: 'assets-online', icon: Activity, iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-100', label: 'Assets Online', key: 'assets_online_pct' as const, suffix: '%' },
-  { id: 'safety-score', icon: ShieldCheck, iconBg: 'bg-sky-50 text-sky-600 border-sky-100', label: 'Safety Score', key: 'safety_score' as const, suffix: '%' },
-  { id: 'energy-efficiency', icon: Zap, iconBg: 'bg-orange-50 text-orange-600 border-orange-100', label: 'Energy Efficiency', key: 'energy_efficiency' as const, suffix: '%' },
-  { id: 'predicted-cost-avoidance', icon: TrendingUp, iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-100', label: 'Predicted Cost Avoidance', key: 'predicted_cost_avoidance_inr' as const, isINR: true },
+interface KpiConfig {
+  id: string;
+  label: string;
+  key: keyof KpiData;
+  type: 'percentage' | 'number' | 'currency';
+  color: string;
+  icon?: React.ComponentType<{ style?: React.CSSProperties }>;
+  increaseIsGood: boolean;
+}
+
+const PERCENTAGE_KPIS: KpiConfig[] = [
+  { id: 'plant-oee', label: 'Plant OEE', key: 'oee_avg', type: 'percentage', color: '#1677E8', increaseIsGood: true },
+  { id: 'assets-online', label: 'Assets Online', key: 'assets_online_pct', type: 'percentage', color: '#18B276', increaseIsGood: true },
+  { id: 'safety-score', label: 'Safety Score', key: 'safety_score', type: 'percentage', color: '#18B276', increaseIsGood: true },
+  { id: 'energy-efficiency', label: 'Energy Efficiency', key: 'energy_efficiency', type: 'percentage', color: '#F2A51A', increaseIsGood: true },
 ];
+
+const NORMAL_KPIS: KpiConfig[] = [
+  { id: 'open-alerts', label: 'Open Alerts', key: 'alerts_active', type: 'number', color: '#FF4D5A', icon: AlertOctagon, increaseIsGood: false },
+  { id: 'breakdown-hours', label: 'Breakdown Hours', key: 'breakdown_hours', type: 'number', color: '#1677E8', icon: Clock, increaseIsGood: false },
+  { id: 'breakdown-cost', label: 'Breakdown Cost', key: 'breakdown_cost_inr', type: 'currency', color: '#7157E8', icon: DollarSign, increaseIsGood: false },
+  { id: 'orders-at-risk', label: 'Orders at Risk', key: 'orders_at_risk', type: 'number', color: '#F2A51A', icon: FileSpreadsheet, increaseIsGood: false },
+  { id: 'predicted-cost-avoidance', label: 'Cost Avoidance', key: 'predicted_cost_avoidance_inr', type: 'currency', color: '#18B276', icon: TrendingUp, increaseIsGood: true },
+];
+
+function CircularGauge({ value, size = 50 }: { value: number; size?: number }) {
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(100, Math.max(0, value));
+  const offset = circumference - (pct / 100) * circumference;
+  const color = pct >= 90 ? '#18B276' : pct >= 75 ? '#1677E8' : pct >= 50 ? '#F2A51A' : '#FF4D5A';
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#EDF1F5" strokeWidth={strokeWidth} />
+        <circle
+          cx={size / 2} cy={size / 2} r={radius} fill="none"
+          stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+      </svg>
+      <span
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ fontSize: 14, fontWeight: 700, color: '#203852' }}
+      >
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="animate-pulse flex flex-col items-center justify-center" style={{ background: '#FFFFFF', border: '1px solid #E2EBF2', borderRadius: 11, height: 112, padding: '10px 14px' }}>
+      <div className="w-12 h-12 rounded-full bg-slate-100 mb-2" />
+      <div className="w-10 h-3 bg-slate-100 rounded mb-1" />
+      <div className="w-16 h-2 bg-slate-100 rounded" />
+    </div>
+  );
+}
+
+interface KpiMetricsRowProps {
+  onCardClick: (cardId: string) => void;
+}
 
 export default function KpiMetricsRow({ onCardClick }: KpiMetricsRowProps) {
   const [kpis, setKpis] = useState<KpiData | null>(null);
@@ -56,38 +101,71 @@ export default function KpiMetricsRow({ onCardClick }: KpiMetricsRowProps) {
     return () => clearInterval(interval);
   }, []);
 
+  const allKpis = [...PERCENTAGE_KPIS, ...NORMAL_KPIS];
+
+  if (!kpis) {
+    return (
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${allKpis.length}, 1fr)`, marginTop: 24, marginBottom: 20 }}>
+        {allKpis.map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3 mb-6">
-      {ICON_CONFIG.map((item) => {
-        const Icon = item.icon;
-        const raw = kpis ? kpis[item.key] : 0;
-        const value = item.isINR ? formatINR(raw) : item.suffix ? `${raw}${item.suffix}` : `${raw}`;
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${allKpis.length}, 1fr)`, marginTop: 24, marginBottom: 20 }}>
+      {allKpis.map((item) => {
+        const raw = kpis[item.key] ?? 0;
+
+        if (item.type === 'percentage') {
+          return (
+            <div
+              key={item.id}
+              onClick={() => onCardClick(item.id)}
+              className="flex flex-col items-center justify-center cursor-pointer transition-all hover:shadow-md"
+              style={{
+                height: 112,
+                background: '#FFFFFF',
+                border: '1px solid #E2EBF2',
+                borderRadius: 11,
+                boxShadow: '0 2px 8px rgba(35,70,105,0.04)',
+                padding: '10px 14px',
+              }}
+            >
+              <CircularGauge value={raw} />
+              <span style={{ fontSize: 9, fontWeight: 500, color: '#7D8EA0', marginTop: 6, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+              {/* Trend row placeholder — backend trend data not yet available */}
+              <span style={{ fontSize: 9, fontWeight: 600, color: '#8495A7', marginTop: 3 }}>—</span>
+            </div>
+          );
+        }
+
+        const Icon = item.icon!;
+        const display = item.type === 'currency' ? formatINR(raw) : typeof raw === 'number' && raw % 1 !== 0 ? raw.toFixed(1) : `${raw}`;
 
         return (
           <div
             key={item.id}
             onClick={() => onCardClick(item.id)}
-            className="group bg-white rounded-xl p-3 border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all duration-150 flex flex-col justify-between cursor-pointer"
+            className="flex flex-col items-center justify-center cursor-pointer transition-all hover:shadow-md"
+            style={{
+              height: 112,
+              background: '#FFFFFF',
+              border: '1px solid #E2EBF2',
+              borderRadius: 11,
+              boxShadow: '0 2px 8px rgba(35,70,105,0.04)',
+              padding: '10px 14px',
+            }}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${item.iconBg}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+            <div
+              className="flex items-center justify-center"
+              style={{ width: 34, height: 34, borderRadius: 8, background: `${item.color}10`, marginBottom: 6 }}
+            >
+              <Icon style={{ width: 17, height: 17, color: item.color }} />
             </div>
-            <div>
-              <div className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
-                {kpis ? value : '—'}
-              </div>
-              <div className="text-[10px] font-medium text-slate-500 mt-0.5 mb-1.5 truncate">
-                {item.label}
-              </div>
-            </div>
-            <div className="pt-1.5 border-t border-slate-100 flex items-center">
-              <span className="flex items-center gap-0.5 text-[11px] font-semibold text-slate-400">
-                {kpis ? 'Live' : 'Loading...'}
-              </span>
-            </div>
+            <span style={{ fontSize: 17, fontWeight: 700, color: '#203852', lineHeight: 1.1 }}>{display}</span>
+            <span style={{ fontSize: 9, fontWeight: 500, color: '#7D8EA0', marginTop: 3, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+            {/* Trend row placeholder */}
+            <span style={{ fontSize: 9, fontWeight: 600, color: '#8495A7', marginTop: 3 }}>—</span>
           </div>
         );
       })}
