@@ -1,0 +1,210 @@
+-- =====================================================================================
+-- PDM incident backend: STUB VERSION for testing the CoCo CLI skill flow
+-- STATUS: written without access to a live Snowflake account, so it is UNTESTED.
+--         Run it through CoCo ("run @snowflake/00_incident_backend_stub.sql and fix any errors")
+--         or with: snow sql -f snowflake/00_incident_backend_stub.sql
+-- IMPORTANT: every value returned here is hard-coded scaffolding (flagged "_stub": true).
+--            Replace each procedure with computed logic before recording or presenting results.
+-- =====================================================================================
+CREATE DATABASE IF NOT EXISTS PDM;
+CREATE SCHEMA IF NOT EXISTS PDM.APP;
+
+CREATE TABLE IF NOT EXISTS PDM.APP.INCIDENTS (
+  INCIDENT_ID STRING, SCENARIO_ID STRING, ASSET_ID STRING, FAULT_MODE STRING, STATE STRING,
+  SEVERITY FLOAT, HOURS_TO_FAILURE FLOAT, CHOSEN_OPTION STRING, APPROVED_BY STRING,
+  APPROVED_TS TIMESTAMP_NTZ, STARTED_TS TIMESTAMP_NTZ, RESOLVED_TS TIMESTAMP_NTZ);
+
+CREATE TABLE IF NOT EXISTS PDM.APP.INCIDENT_OPTIONS (
+  INCIDENT_ID STRING, OPTION_ID STRING, LABEL STRING, SAFETY_STATUS STRING, SAFETY_SCORE NUMBER(5,1),
+  EXPECTED_COST_INR NUMBER(14,0), EXPECTED_DOWNTIME_H NUMBER(6,1), P_FAIL_BEFORE_REPAIR NUMBER(4,2),
+  SUSTAINABILITY_SCRAP_KG NUMBER(10,0), SUPPLY_NOTE STRING, RECOMMENDED BOOLEAN);
+
+CREATE TABLE IF NOT EXISTS PDM.APP.INCIDENT_ACTIONS (
+  INCIDENT_ID STRING, OPTION_ID STRING, STEP NUMBER, ACTION_TYPE STRING, TARGET STRING, STATUS STRING, TS TIMESTAMP_NTZ);
+
+CREATE TABLE IF NOT EXISTS PDM.APP.INCIDENT_EVENTS (INCIDENT_ID STRING, TS TIMESTAMP_NTZ, EVENT STRING, DETAIL STRING);
+CREATE TABLE IF NOT EXISTS PDM.APP.WATCH_STATE (ASSET_ID STRING, MODE STRING, UPDATED_TS TIMESTAMP_NTZ);
+
+-- ------------------------------------------------------------------ reset (use before every take)
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_RESET_DEMO()
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  TRUNCATE TABLE PDM.APP.INCIDENTS;
+  TRUNCATE TABLE PDM.APP.INCIDENT_OPTIONS;
+  TRUNCATE TABLE PDM.APP.INCIDENT_ACTIONS;
+  TRUNCATE TABLE PDM.APP.INCIDENT_EVENTS;
+  TRUNCATE TABLE PDM.APP.WATCH_STATE;
+  INSERT INTO PDM.APP.WATCH_STATE VALUES ('ALL', 'GUARD', CURRENT_TIMESTAMP());
+  RETURN 'Demo reset: guard mode';
+END;
+$$;
+
+-- ------------------------------------------------------------------ skill 1: detect
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_START_SCENARIO(P_SCENARIO STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  iid STRING;
+BEGIN
+  IF (UPPER(P_SCENARIO) <> 'S1') THEN
+    RETURN OBJECT_CONSTRUCT('error', 'Only scenario S1 is available in the stub backend');
+  END IF;
+  iid := 'INC-' || TO_VARCHAR(CURRENT_TIMESTAMP(), 'YYYYMMDD-HH24MISS');
+  INSERT INTO PDM.APP.INCIDENTS
+    (INCIDENT_ID, SCENARIO_ID, ASSET_ID, FAULT_MODE, STATE, SEVERITY, HOURS_TO_FAILURE, STARTED_TS)
+    VALUES (:iid, 'S1', 'ASSET_002', 'bearing_wear', 'DETECTED', 0.80, 25.4, CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:iid, CURRENT_TIMESTAMP(), 'DETECTED', 'Scenario S1 started: bearing wear on CNC-02');
+  DELETE FROM PDM.APP.WATCH_STATE;
+  INSERT INTO PDM.APP.WATCH_STATE VALUES ('ASSET_002', 'INCIDENT', CURRENT_TIMESTAMP());
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'incident_id', iid, 'asset_id', 'ASSET_002', 'asset_name', 'CNC-02',
+                          'fault', 'bearing_wear', 'state', 'DETECTED', 'severity', 0.80, 'hours_to_failure', 25.4);
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_SCORE_ASSETS()
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'assets_scored', 16, 'alerts_raised', 1, 'top_asset', 'ASSET_002');
+END;
+$$;
+
+-- ------------------------------------------------------------------ skill 2: assess options
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_ASSESS_INCIDENT(P_INCIDENT STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  UPDATE PDM.APP.INCIDENTS SET STATE = 'ASSESSING' WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'ASSESSING', 'Evidence and constraints gathered');
+  RETURN OBJECT_CONSTRUCT(
+    '_stub', TRUE, 'incident_id', P_INCIDENT,
+    'evidence', OBJECT_CONSTRUCT('rms_mm_s', 5.79, 'rms_baseline_mm_s', 1.59, 'kurtosis', 7.50, 'crest_factor', 5.41, 'bearing_outer_c', 68.1),
+    'constraints', OBJECT_CONSTRUCT('bearing_stock', 1, 'grease_stock', 0, 'night_shift_certified_technician', FALSE,
+                                    'orders_at_risk_count', 3, 'orders_at_risk_inr', 44377985,
+                                    'warranty_note', 'Lubrication neglect is excluded under contract CON_002'),
+    'sources', ARRAY_CONSTRUCT('SOP-001', 'SOP-002', 'CON_002', 'WO_0090'));
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_GENERATE_OPTIONS(P_INCIDENT STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  res VARIANT;
+BEGIN
+  DELETE FROM PDM.APP.INCIDENT_OPTIONS WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_OPTIONS VALUES
+    (:P_INCIDENT, 'A', 'Stop now and repair tonight (technician call-out)', 'OK', 95.0, 342000, 6.0, 0.00, 0,
+     'Only substitute grease arrives in time: warranty risk', FALSE),
+    (:P_INCIDENT, 'B', 'Run at reduced load, repair on the Afternoon shift', 'OK', 82.0, 296000, 4.0, 0.18, 410,
+     'Inter-plant grease transfer arrives before repair', TRUE),
+    (:P_INCIDENT, 'C', 'Keep running normally until the grease PO arrives', 'BLOCKED', 12.0, 1420000, 22.0, 0.95, 1800,
+     'PO arrives after predicted failure', FALSE);
+  UPDATE PDM.APP.INCIDENTS SET STATE = 'AWAITING_DECISION' WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'AWAITING_DECISION', 'Three options generated');
+  res := (SELECT ARRAY_AGG(OBJECT_CONSTRUCT('option_id', OPTION_ID, 'label', LABEL, 'safety_status', SAFETY_STATUS,
+            'expected_cost_inr', EXPECTED_COST_INR, 'expected_downtime_h', EXPECTED_DOWNTIME_H,
+            'p_fail_before_repair', P_FAIL_BEFORE_REPAIR, 'sustainability_scrap_kg', SUSTAINABILITY_SCRAP_KG,
+            'supply_note', SUPPLY_NOTE, 'recommended', RECOMMENDED))
+          FROM PDM.APP.INCIDENT_OPTIONS WHERE INCIDENT_ID = :P_INCIDENT);
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'incident_id', P_INCIDENT, 'options', res);
+END;
+$$;
+
+-- ------------------------------------------------------------------ skill 3: execute and recover
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_RECORD_APPROVAL(P_INCIDENT STRING, P_OPTION STRING, P_APPROVER STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  opt_count INTEGER;
+  blocked_count INTEGER;
+BEGIN
+  opt_count := (SELECT COUNT(*) FROM PDM.APP.INCIDENT_OPTIONS WHERE INCIDENT_ID = :P_INCIDENT AND OPTION_ID = :P_OPTION);
+  IF (opt_count = 0) THEN
+    RETURN OBJECT_CONSTRUCT('error', 'Unknown option for this incident');
+  END IF;
+  blocked_count := (SELECT COUNT(*) FROM PDM.APP.INCIDENT_OPTIONS WHERE INCIDENT_ID = :P_INCIDENT AND OPTION_ID = :P_OPTION AND SAFETY_STATUS = 'BLOCKED');
+  IF (blocked_count > 0) THEN
+    RETURN OBJECT_CONSTRUCT('error', 'Option is blocked by the safety gate and cannot be approved');
+  END IF;
+  UPDATE PDM.APP.INCIDENTS SET CHOSEN_OPTION = :P_OPTION, APPROVED_BY = :P_APPROVER, APPROVED_TS = CURRENT_TIMESTAMP(), STATE = 'APPROVED'
+    WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'APPROVED', 'Option ' || :P_OPTION || ' approved by ' || :P_APPROVER);
+  RETURN OBJECT_CONSTRUCT('incident_id', P_INCIDENT, 'option', P_OPTION, 'approved_by', P_APPROVER, 'state', 'APPROVED');
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_EXECUTE_OPTION(P_INCIDENT STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+DECLARE
+  approver STRING;
+  opt STRING;
+  res VARIANT;
+BEGIN
+  approver := (SELECT APPROVED_BY FROM PDM.APP.INCIDENTS WHERE INCIDENT_ID = :P_INCIDENT);
+  IF (approver IS NULL) THEN
+    RETURN OBJECT_CONSTRUCT('error', 'No recorded approval. Refusing to execute.');
+  END IF;
+  opt := (SELECT CHOSEN_OPTION FROM PDM.APP.INCIDENTS WHERE INCIDENT_ID = :P_INCIDENT);
+  DELETE FROM PDM.APP.INCIDENT_ACTIONS WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_ACTIONS VALUES (:P_INCIDENT, :opt, 1, 'NOTIFY_TECHNICIAN', 'TECH_011', 'ACKNOWLEDGED', CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.INCIDENT_ACTIONS VALUES (:P_INCIDENT, :opt, 2, 'SET_MACHINE_STATE', 'ASSET_002', IFF(:opt = 'A', 'STOPPED', 'DERATED'), CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.INCIDENT_ACTIONS VALUES (:P_INCIDENT, :opt, 3, 'RESERVE_PARTS', 'PART_0001 spindle bearing set x1', 'RESERVED', CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.INCIDENT_ACTIONS VALUES (:P_INCIDENT, :opt, 4, 'SUPPLY_REQUEST', 'PART_0052 grease, inter-plant transfer', 'REQUESTED', CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.INCIDENT_ACTIONS VALUES (:P_INCIDENT, :opt, 5, 'CREATE_WORK_ORDER', 'Predictive WO draft for CNC-02', 'CREATED', CURRENT_TIMESTAMP());
+  UPDATE PDM.APP.INCIDENTS SET STATE = 'EXECUTING' WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'EXECUTING', 'Actions executed for option ' || :opt);
+  res := (SELECT ARRAY_AGG(OBJECT_CONSTRUCT('step', STEP, 'action', ACTION_TYPE, 'target', TARGET, 'status', STATUS))
+          FROM PDM.APP.INCIDENT_ACTIONS WHERE INCIDENT_ID = :P_INCIDENT);
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'incident_id', P_INCIDENT, 'option', opt, 'approved_by', approver, 'actions', res);
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_VERIFY_RECOVERY(P_INCIDENT STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  UPDATE PDM.APP.INCIDENTS SET STATE = 'RESOLVED', RESOLVED_TS = CURRENT_TIMESTAMP() WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'RESOLVED', 'Recovery criteria met');
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'incident_id', P_INCIDENT,
+    'before', OBJECT_CONSTRUCT('severity', 0.80, 'rms_mm_s', 5.79, 'risk_score', 94, 'orders_at_risk_inr', 44377985),
+    'after',  OBJECT_CONSTRUCT('severity', 0.05, 'rms_mm_s', 1.62, 'risk_score', 8,  'orders_at_risk_inr', 0));
+END;
+$$;
+
+CREATE OR REPLACE PROCEDURE PDM.APP.SP_RETURN_TO_GUARD(P_INCIDENT STRING)
+RETURNS VARIANT
+LANGUAGE SQL
+AS
+$$
+BEGIN
+  DELETE FROM PDM.APP.WATCH_STATE;
+  INSERT INTO PDM.APP.WATCH_STATE VALUES ('ASSET_002', 'HEIGHTENED_WATCH', CURRENT_TIMESTAMP());
+  INSERT INTO PDM.APP.WATCH_STATE VALUES ('ALL', 'GUARD', CURRENT_TIMESTAMP());
+  UPDATE PDM.APP.INCIDENTS SET STATE = 'CLOSED' WHERE INCIDENT_ID = :P_INCIDENT;
+  INSERT INTO PDM.APP.INCIDENT_EVENTS VALUES (:P_INCIDENT, CURRENT_TIMESTAMP(), 'CLOSED', 'Back to guard mode; heightened watch for two shifts');
+  RETURN OBJECT_CONSTRUCT('_stub', TRUE, 'incident_id', P_INCIDENT, 'mode', 'GUARD', 'asset_watch', 'HEIGHTENED_WATCH for two shifts');
+END;
+$$;
+
+-- quick smoke test (run manually):
+-- CALL PDM.APP.SP_RESET_DEMO();
+-- CALL PDM.APP.SP_START_SCENARIO('S1');

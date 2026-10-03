@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { AlertTriangle, AlertCircle, Bot, Zap, ArrowRight } from 'lucide-react';
+import { fetchApi } from '@/lib/api';
 
 export interface MachineAlert {
   id: string;
@@ -15,38 +17,7 @@ export interface MachineAlert {
   recommendedAction: string;
 }
 
-export const MACHINE_ALERTS: MachineAlert[] = [
-  {
-    id: 'cnc-02',
-    machine: 'CNC-02',
-    issue: 'Spindle overheat (112°C)',
-    location: 'Riverside • CNC Line',
-    severity: 'Critical',
-    time: '12 min ago',
-    temperature: '112°C (Threshold: 90°C)',
-    recommendedAction: 'Schedule emergency bearing inspection & reduce spindle RPM by 25%.',
-  },
-  {
-    id: 'press-07',
-    machine: 'Press-07',
-    issue: 'Hydraulic pressure low',
-    location: 'Munich • Stamping',
-    severity: 'Warning',
-    time: '28 min ago',
-    pressure: '142 bar (Target: 180 bar)',
-    recommendedAction: 'Check auxiliary valve seals and hydraulic fluid replenishment.',
-  },
-  {
-    id: 'robot-12',
-    machine: 'Robot-12',
-    issue: 'Vibration anomaly detected',
-    location: 'Pune • Assembly Line 3',
-    severity: 'Warning',
-    time: '41 min ago',
-    vibration: '4.8 mm/s RMS (Harmonic spike)',
-    recommendedAction: 'Recalibrate harmonic drive gear joint 3 during next shift break.',
-  },
-];
+export let MACHINE_ALERTS: MachineAlert[] = [];
 
 interface CriticalMachineAlertsProps {
   onSelectAlert: (alert: MachineAlert) => void;
@@ -57,6 +28,19 @@ export default function CriticalMachineAlerts({
   onSelectAlert,
   onViewAll,
 }: CriticalMachineAlertsProps) {
+  const [alerts, setAlerts] = useState<MachineAlert[]>([]);
+
+  useEffect(() => {
+    const load = () => fetchApi<MachineAlert[]>('/api/alerts?limit=3', []).then((data) => {
+      setAlerts(data);
+      MACHINE_ALERTS = data;
+    });
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayAlerts = alerts.length > 0 ? alerts : MACHINE_ALERTS;
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs">
       {/* Header */}
@@ -66,13 +50,13 @@ export default function CriticalMachineAlerts({
           onClick={onViewAll}
           className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
         >
-          View All (3)
+          View All ({displayAlerts.length})
         </button>
       </div>
 
       {/* Alert Items */}
       <div className="space-y-3">
-        {MACHINE_ALERTS.map((alert) => {
+        {displayAlerts.map((alert) => {
           const isCritical = alert.severity === 'Critical';
 
           return (

@@ -1,124 +1,85 @@
 'use client';
 
-interface MaintenanceReadinessCardProps {
-  onViewPlan: () => void;
+import { Wrench, ChevronRight, Users as UsersIcon, ClipboardList, Target, Package } from 'lucide-react';
+import { SAMPLE_MAINTENANCE_SEGMENTS, SAMPLE_MAINTENANCE_MINIS } from '@/lib/sample-data';
+
+interface Props { onViewPlan: () => void }
+
+function Donut({ segments, size, stroke, centerVal, centerLabel }: { segments: { pct: number; color: string }[]; size: number; stroke: number; centerVal: string; centerLabel: string }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const gap = 2;
+  let offset = 0;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#EDF1F5" strokeWidth={stroke} />
+        {segments.map((s, i) => {
+          const dash = Math.max(0, (s.pct / 100) * c - gap);
+          const el = <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={-offset} />;
+          offset += (s.pct / 100) * c;
+          return el;
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span style={{ fontSize: 21, fontWeight: 700, color: '#172B4D', lineHeight: 1 }}>{centerVal}</span>
+        <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', marginTop: 2, textAlign: 'center' }}>{centerLabel}</span>
+      </div>
+    </div>
+  );
 }
 
-export default function MaintenanceReadinessCard({ onViewPlan }: MaintenanceReadinessCardProps) {
-  // SVG Donut calculation
-  // Total assets = 1 + 8 + 23 + 284 = 316
-  // On track = 284 (~90%), Next week = 23 (~7%), This week = 8 (~2.5%), Due today = 1 (~0.5%)
-  const radius = 42;
-  const strokeWidth = 10;
-  const circumference = 2 * Math.PI * radius; // ~263.89
+const ICONS: Record<string, React.ComponentType<{ style?: React.CSSProperties }>> = {
+  users: UsersIcon, clipboard: ClipboardList, target: Target, package: Package,
+};
 
-  // Angles/offsets for SVG ring
-  const healthyPercent = 94;
-  const healthyDash = (healthyPercent / 100) * circumference;
-
+export default function MaintenanceReadinessCard({ onViewPlan }: Props) {
+  const segs = SAMPLE_MAINTENANCE_SEGMENTS;
+  const minis = SAMPLE_MAINTENANCE_MINIS;
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+    <div style={{ height: 260, background: '#FFF', border: '1px solid #E2EBF2', borderRadius: 11, boxShadow: '0 2px 10px rgba(23,43,77,0.05)', padding: '12px 14px', overflow: 'hidden', boxSizing: 'border-box' }}>
       {/* Header */}
-      <div>
-        <h2 className="text-sm font-bold text-slate-900 tracking-tight">Maintenance Readiness</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Asset health and upcoming work.</p>
+      <div className="flex items-center justify-between" style={{ height: 30, marginBottom: 6 }}>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 8, background: '#EEF6FF', border: '1px solid #DCEBFA' }}>
+            <Wrench style={{ width: 16, height: 16, color: '#1677E8' }} />
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#172B4D' }}>Maintenance Readiness</span>
+        </div>
+        <button onClick={onViewPlan} className="flex items-center gap-0.5 cursor-pointer" style={{ fontSize: 8, fontWeight: 600, color: '#1677E8' }}>View Details <ChevronRight style={{ width: 10, height: 10 }} /></button>
       </div>
 
-      {/* Donut & Legend Container */}
-      <div className="flex items-center justify-between gap-4 my-3">
-        {/* SVG Donut */}
-        <div className="relative w-28 h-28 shrink-0 flex items-center justify-center">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-            {/* Background base track */}
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              fill="transparent"
-              stroke="#f1f5f9"
-              strokeWidth={strokeWidth}
-            />
-            {/* Warning portion */}
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              fill="transparent"
-              stroke="#f59e0b"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={circumference * 0.03}
-              strokeLinecap="round"
-            />
-            {/* Critical due today portion */}
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              fill="transparent"
-              stroke="#ef4444"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${circumference * 0.05} ${circumference}`}
-              strokeDashoffset={0}
-              strokeLinecap="round"
-            />
-            {/* Healthy green / teal portion */}
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              fill="transparent"
-              stroke="#0d9488"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${healthyDash} ${circumference}`}
-              strokeDashoffset={circumference * -0.06}
-              strokeLinecap="round"
-            />
-          </svg>
-
-          {/* Inner Text */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-lg font-extrabold text-slate-900 leading-tight">94%</span>
-            <span className="text-[9px] font-medium text-slate-400 leading-tight">Assets healthy</span>
-          </div>
-        </div>
-
-        {/* Legend items */}
-        <div className="flex-1 space-y-1.5 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-              <strong className="text-slate-900">1</strong> Due today
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-              <strong className="text-slate-900">8</strong> This week
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-              <strong className="text-slate-900">23</strong> Next week
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-              <strong className="text-slate-900">284</strong> On track
-            </span>
-          </div>
+      {/* Donut + Legend */}
+      <div className="flex items-center gap-3" style={{ height: 118 }}>
+        <Donut segments={segs.map(s => ({ pct: s.pct, color: s.color }))} size={110} stroke={12} centerVal="94%" centerLabel="Asset Readiness" />
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          {segs.map(s => (
+            <div key={s.label} className="flex items-center gap-1.5" style={{ height: 18 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 9, fontWeight: 500, color: '#52677D', flex: 1, minWidth: 0 }}>{s.label}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#203852', width: 32, textAlign: 'right' }}>{s.pct}%</span>
+              <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', width: 28, textAlign: 'right' }}>{s.count}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Button */}
-      <button
-        onClick={onViewPlan}
-        className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-blue-600 transition-colors text-center cursor-pointer shadow-2xs"
-      >
-        View maintenance plan
-      </button>
+      {/* Mini metrics */}
+      <div className="grid grid-cols-4 gap-1.5" style={{ marginTop: 8 }}>
+        {minis.map(m => {
+          const Ic = ICONS[m.icon] || Package;
+          return (
+            <div key={m.label} style={{ border: '1px solid #E2EBF2', borderRadius: 7, padding: '5px 6px' }}>
+              <div className="flex items-center gap-1 mb-0.5">
+                <Ic style={{ width: 13, height: 13, color: '#8495A7' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#172B4D' }}>{m.value}</span>
+              </div>
+              <span style={{ fontSize: 7, fontWeight: 500, color: '#8495A7', display: 'block' }}>{m.label}</span>
+              <span style={{ fontSize: 7, fontWeight: 600, color: m.subColor || '#8495A7' }}>{m.sub}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

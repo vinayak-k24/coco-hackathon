@@ -1,22 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
   TrendingDown,
-  Gauge,
   Map,
-  LayoutGrid,
   List,
   Globe2,
-  Users,
-  Box,
-  DollarSign,
-  AlertTriangle,
   AlertOctagon,
+  AlertTriangle,
 } from 'lucide-react';
 import Image from 'next/image';
+import { fetchApi } from '@/lib/api';
 
 export interface FactoryPlant {
   id: string;
@@ -39,256 +36,213 @@ export interface FactoryPlant {
   annualRevenue: string;
 }
 
-export const FACTORIES: FactoryPlant[] = [
-  {
-    id: 'berlin',
-    name: 'Berlin, Germany',
-    specialty: 'Automotive Components',
-    country: 'Germany',
-    image: 'https://picsum.photos/seed/berlin-factory/400/300',
-    health: 98,
-    change: '2%',
-    isNegative: false,
-    critical: 2,
-    warning: 4,
-    online: 94,
-    manager: 'Hans Weber',
-    lines: 7,
-    oee: 94,
-    workforce: 216,
-    assets: 312,
-    readinessRUL: '$48.2M',
-    annualRevenue: '$52.1M',
-  },
-  {
-    id: 'chicago',
-    name: 'Chicago, USA',
-    specialty: 'Industrial Machinery',
-    country: 'USA',
-    image: 'https://picsum.photos/seed/chicago-factory/400/300',
-    health: 92,
-    change: '4%',
-    isNegative: false,
-    critical: 1,
-    warning: 3,
-    online: 91,
-    manager: 'Sarah Jenkins',
-    lines: 8,
-    oee: 91,
-    workforce: 248,
-    assets: 296,
-    readinessRUL: '$36.4M',
-    annualRevenue: '$52.1M',
-  },
-  {
-    id: 'monterrey',
-    name: 'Monterrey, Mexico',
-    specialty: 'Electronics',
-    country: 'Mexico',
-    image: 'https://picsum.photos/seed/monterrey-factory/400/300',
-    health: 88,
-    change: '1%',
-    isNegative: true,
-    critical: 1,
-    warning: 5,
-    online: 87,
-    manager: 'Carlos Mendez',
-    lines: 6,
-    oee: 87,
-    workforce: 192,
-    assets: 276,
-    readinessRUL: '$35.4M',
-    annualRevenue: '$36.4M',
-  },
-  {
-    id: 'singapore',
-    name: 'Singapore',
-    specialty: 'Precision Manufacturing',
-    country: 'Singapore',
-    image: 'https://picsum.photos/seed/singapore-factory/400/300',
-    health: 95,
-    change: '3%',
-    isNegative: false,
-    critical: 0,
-    warning: 2,
-    online: 93,
-    manager: 'Li Wei Chen',
-    lines: 10,
-    oee: 93,
-    workforce: 236,
-    assets: 362,
-    readinessRUL: '$61.7M',
-    annualRevenue: '$61.7M',
-  },
-];
+export let FACTORIES: FactoryPlant[] = [];
 
 interface PlantHealthOverviewProps {
   onSelectFactory: (factory: FactoryPlant) => void;
 }
 
-export default function PlantHealthOverview({ onSelectFactory }: PlantHealthOverviewProps) {
-  const [viewMode, setViewMode] = useState<'map' | 'grid' | 'list'>('grid');
-
-  const totalFactories = FACTORIES.length;
-  const totalAssets = FACTORIES.reduce((sum, f) => sum + f.assets, 0).toLocaleString();
-  const totalWorkforce = FACTORIES.reduce((sum, f) => sum + f.workforce, 0).toLocaleString();
+function HealthCircle({ value }: { value: number }) {
+  const size = 50;
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(100, Math.max(0, value));
+  const offset = circumference - (pct / 100) * circumference;
+  const color = pct >= 90 ? '#18B276' : pct >= 75 ? '#1677E8' : pct >= 50 ? '#F2A51A' : '#FF4D5A';
 
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-2xs">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-            <Globe2 className="w-4.5 h-4.5 text-blue-600" />
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#EDF1F5" strokeWidth={strokeWidth} />
+        <circle
+          cx={size / 2} cy={size / 2} r={radius} fill="none"
+          stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#203852', lineHeight: 1 }}>{value}</span>
+        <span style={{ fontSize: 8, fontWeight: 500, color: '#8495A7', lineHeight: 1, marginTop: 1 }}>Health</span>
+      </div>
+    </div>
+  );
+}
+
+export default function PlantHealthOverview({ onSelectFactory }: PlantHealthOverviewProps) {
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [plants, setPlants] = useState<FactoryPlant[]>([]);
+  const [scrollIndex, setScrollIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const load = () => fetchApi<FactoryPlant[]>('/api/plants', []).then((data) => {
+      setPlants(data);
+      FACTORIES = data;
+    });
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayPlants = plants.length > 0 ? plants : FACTORIES;
+  const totalFactories = displayPlants.length;
+  const totalAssets = displayPlants.reduce((sum, f) => sum + (f.assets || 0), 0).toLocaleString();
+  const totalWorkforce = displayPlants.reduce((sum, f) => sum + (f.workforce || 0), 0).toLocaleString();
+
+  const canPrev = scrollIndex > 0;
+  const canNext = scrollIndex < displayPlants.length - 1;
+  const prev = () => setScrollIndex((i) => Math.max(0, i - 1));
+  const next = () => setScrollIndex((i) => Math.min(displayPlants.length - 1, i + 1));
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const card = scrollRef.current.children[scrollIndex] as HTMLElement;
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    }
+  }, [scrollIndex]);
+
+  return (
+    <div className="flex flex-col h-full" style={{ background: '#FFFFFF', border: '1px solid #E2EBF2', borderRadius: 12, boxShadow: '0 2px 8px rgba(35,70,105,0.04)', padding: '14px 16px' }}>
+      {/* Header — ~50px */}
+      <div className="flex items-center justify-between shrink-0" style={{ height: 50, marginBottom: 12 }}>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-center" style={{ width: 38, height: 38, borderRadius: 9, background: '#EDF4FC', border: '1px solid #D8E6F2' }}>
+            <Globe2 style={{ width: 17, height: 17, color: '#1677E8' }} />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">Plant Network Overview</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#172B4D', margin: 0, lineHeight: 1.2 }}>Plant Network Overview</h2>
+            <p style={{ fontSize: 11, fontWeight: 500, color: '#8495A7', margin: 0, marginTop: 2 }}>
               {totalFactories} factories • {totalAssets} assets • {totalWorkforce} workforce
             </p>
           </div>
         </div>
 
-        {/* View toggle */}
-        <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
-          <button
-            onClick={() => setViewMode('map')}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-              viewMode === 'map' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-700'
-            }`}
-            title="Map View"
-          >
-            <Map className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5">
+          {/* Map / List toggle */}
+          <div className="flex items-center" style={{ height: 34, background: '#F4F8FC', border: '1px solid #E2EAF1', borderRadius: 8, padding: 2 }}>
+            <button
+              onClick={() => setViewMode('map')}
+              className="flex items-center gap-1 px-2.5 cursor-pointer transition-colors"
+              style={{
+                height: 30, borderRadius: 6,
+                background: viewMode === 'map' ? '#FFFFFF' : 'transparent',
+                fontWeight: viewMode === 'map' ? 600 : 500,
+                fontSize: 11, color: viewMode === 'map' ? '#172B4D' : '#8495A7',
+                boxShadow: viewMode === 'map' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+              }}
+            >
+              <Map style={{ width: 12, height: 12 }} /><span>Map</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className="flex items-center gap-1 px-2.5 cursor-pointer transition-colors"
+              style={{
+                height: 30, borderRadius: 6,
+                background: viewMode === 'list' ? '#FFFFFF' : 'transparent',
+                fontWeight: viewMode === 'list' ? 600 : 500,
+                fontSize: 11, color: viewMode === 'list' ? '#172B4D' : '#8495A7',
+                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+              }}
+            >
+              <List style={{ width: 12, height: 12 }} /><span>List</span>
+            </button>
+          </div>
+
+          {/* Carousel nav */}
+          <button onClick={prev} disabled={!canPrev} className="flex items-center justify-center cursor-pointer transition-colors"
+            style={{ width: 32, height: 32, borderRadius: 8, background: canPrev ? '#FFFFFF' : '#F8FAFC', border: '1px solid #DFE8F0', color: canPrev ? '#667C91' : '#C5D0DB' }}>
+            <ChevronLeft style={{ width: 15, height: 15 }} />
           </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-              viewMode === 'grid' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-700'
-            }`}
-            title="Grid View"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-              viewMode === 'list' ? 'bg-white shadow-2xs text-blue-600' : 'text-slate-500 hover:text-slate-700'
-            }`}
-            title="List View"
-          >
-            <List className="w-3.5 h-3.5" />
+          <button onClick={next} disabled={!canNext} className="flex items-center justify-center cursor-pointer transition-colors"
+            style={{ width: 32, height: 32, borderRadius: 8, background: canNext ? '#FFFFFF' : '#F8FAFC', border: '1px solid #DFE8F0', color: canNext ? '#667C91' : '#C5D0DB' }}>
+            <ChevronRight style={{ width: 15, height: 15 }} />
           </button>
         </div>
       </div>
 
-      {/* 4 Factory Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {FACTORIES.map((factory) => {
-          const isRed = factory.health < 80;
-          const isGood = factory.health >= 90;
-
-          return (
+      {/* Factory Cards — fills remaining height */}
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth flex-1 min-h-0">
+        {displayPlants.length === 0 ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="shrink-0 animate-pulse" style={{ width: 'calc(33.333% - 11px)', minWidth: 200, background: '#F8FAFC', border: '1px solid #E3EBF2', borderRadius: 11, height: '100%' }} />
+          ))
+        ) : (
+          displayPlants.map((factory) => (
             <div
               key={factory.id}
               onClick={() => onSelectFactory(factory)}
-              className="group rounded-xl border border-slate-200/90 hover:border-blue-400/80 hover:shadow-md transition-all duration-200 cursor-pointer bg-gradient-to-b from-white to-slate-50/50 flex flex-col overflow-hidden"
+              className="shrink-0 cursor-pointer transition-all hover:shadow-md group flex flex-col"
+              style={{
+                width: `calc(${100 / Math.min(displayPlants.length, 3)}% - ${displayPlants.length > 1 ? 11 : 0}px)`,
+                minWidth: 200,
+                background: '#FFFFFF',
+                border: '1px solid #E3EBF2',
+                borderRadius: 11,
+                boxShadow: '0 2px 8px rgba(35,70,105,0.04)',
+                overflow: 'hidden',
+              }}
             >
-              {/* Factory Image */}
-              <div className="relative w-full h-28 overflow-hidden">
-                <Image
-                  src={factory.image}
-                  alt={factory.name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
-
-                {/* Health Score Badge */}
-                <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-extrabold border-2 shadow-md ${
-                      isGood
-                        ? 'bg-emerald-500 text-white border-emerald-400'
-                        : isRed
-                        ? 'bg-red-500 text-white border-red-400'
-                        : 'bg-amber-500 text-white border-amber-400'
-                    }`}
-                  >
-                    {factory.health}
-                  </div>
-                </div>
-
-                {/* Factory Name Overlay */}
-                <div className="absolute bottom-2 left-2.5 z-10">
-                  <h3 className="text-sm font-bold text-white drop-shadow-md">{factory.name}</h3>
-                  <p className="text-[10px] text-white/80 font-medium">{factory.specialty}</p>
+              {/* Image */}
+              <div className="relative w-full shrink-0 overflow-hidden" style={{ height: 72 }}>
+                <Image src={factory.image} alt={factory.name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute top-2 right-2">
+                  <HealthCircle value={factory.health} />
                 </div>
               </div>
 
-              {/* Stats Grid */}
-              <div className="p-3 space-y-2.5">
-                {/* OEE / Workforce / Assets / Revenue */}
-                <div className="grid grid-cols-4 gap-1 text-center text-[10px]">
-                  <div>
-                    <span className="text-slate-400 block">OEE</span>
-                    <span className="font-bold text-slate-900 text-xs">{factory.oee}%</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Workforce</span>
-                    <span className="font-bold text-slate-900 text-xs">{factory.workforce}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Assets</span>
-                    <span className="font-bold text-slate-900 text-xs">{factory.assets}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Assets/RUL</span>
-                    <span className="font-bold text-slate-900 text-xs">{factory.readinessRUL}</span>
-                  </div>
+              {/* Content */}
+              <div className="flex flex-col flex-1" style={{ padding: '8px 10px 10px' }}>
+                <div style={{ marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#172B4D', display: 'block', lineHeight: 1.2 }}>
+                    {factory.name?.split(' ')[0] || factory.id}, {factory.country}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 500, color: '#8293A5' }}>{factory.specialty}</span>
                 </div>
 
-                {/* Trend + Revenue Row */}
-                <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-                  <div
-                    className={`flex items-center gap-0.5 text-[11px] font-semibold ${
-                      factory.isNegative ? 'text-red-600' : 'text-emerald-600'
-                    }`}
-                  >
-                    {factory.isNegative ? (
-                      <TrendingDown className="w-3.5 h-3.5" />
-                    ) : (
-                      <TrendingUp className="w-3.5 h-3.5" />
-                    )}
+                {/* Metrics */}
+                <div className="grid grid-cols-4 gap-1" style={{ marginBottom: 6 }}>
+                  {[
+                    { label: 'OEE', value: `${factory.oee}%` },
+                    { label: 'Workforce', value: factory.workforce },
+                    { label: 'Assets', value: factory.assets },
+                    { label: 'Revenue', value: factory.annualRevenue },
+                  ].map((m) => (
+                    <div key={m.label} className="text-center">
+                      <span style={{ fontSize: 8, fontWeight: 500, color: '#8797A7', display: 'block' }}>{m.label}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#344B63' }}>{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Trend + Alerts */}
+                <div className="flex items-center justify-between mt-auto" style={{ borderTop: '1px solid #E7EEF4', paddingTop: 7 }}>
+                  <div className="flex items-center gap-0.5" style={{ fontSize: 10, fontWeight: 600, color: factory.isNegative ? '#FF4D5A' : '#18B276' }}>
+                    {factory.isNegative ? <TrendingDown style={{ width: 12, height: 12 }} /> : <TrendingUp style={{ width: 12, height: 12 }} />}
                     <span>{factory.change}</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-medium">{factory.annualRevenue}</span>
-                </div>
-
-                {/* Critical/Warning Badges */}
-                <div className="flex items-center gap-2">
-                  {factory.critical > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200/60">
-                      <AlertOctagon className="w-3 h-3" />
-                      {factory.critical} Critical
-                    </span>
-                  )}
-                  {factory.warning > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                      <AlertTriangle className="w-3 h-3" />
-                      {factory.warning} Warning
-                    </span>
-                  )}
-                  {factory.critical === 0 && factory.warning === 0 && (
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                      ✓ All Clear
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {factory.critical > 0 && (
+                      <span className="flex items-center gap-0.5" style={{ fontSize: 9, fontWeight: 700, color: '#FF4D5A', background: '#FEF2F2', padding: '2px 7px', borderRadius: 10 }}>
+                        <AlertOctagon style={{ width: 10, height: 10 }} /> {factory.critical} Critical
+                      </span>
+                    )}
+                    {factory.warning > 0 && factory.critical === 0 && (
+                      <span className="flex items-center gap-0.5" style={{ fontSize: 9, fontWeight: 700, color: '#F2A51A', background: '#FFFBEB', padding: '2px 7px', borderRadius: 10 }}>
+                        <AlertTriangle style={{ width: 10, height: 10 }} /> {factory.warning} Warning
+                      </span>
+                    )}
+                    {factory.critical === 0 && factory.warning === 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 600, color: '#18B276' }}>● No active alerts</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          );
-        })}
+          ))
+        )}
       </div>
     </div>
   );
