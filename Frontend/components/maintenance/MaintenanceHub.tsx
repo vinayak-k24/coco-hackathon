@@ -10,7 +10,7 @@ interface MaintenanceHubProps {
 }
 
 export default function MaintenanceHub({ onInspectAsset }: MaintenanceHubProps = {}) {
-  const [selectedMachine, setSelectedMachine] = useState<MachineQueueItem>(QUEUE_MACHINES[0]);
+  const [selectedMachine, setSelectedMachine] = useState<MachineQueueItem | null>(QUEUE_MACHINES[0] ?? null);
   const [isWorkOrderModalOpen, setIsWorkOrderModalOpen] = useState(false);
   const [workOrderSuccess, setWorkOrderSuccess] = useState(false);
 
@@ -44,24 +44,34 @@ export default function MaintenanceHub({ onInspectAsset }: MaintenanceHubProps =
         {/* Left Column: Priority Queue */}
         <div className="xl:col-span-4 2xl:col-span-3">
           <MaintenanceQueue
-            selectedMachineId={selectedMachine.id}
+            selectedMachineId={selectedMachine?.id ?? ''}
             onSelectMachine={(m) => setSelectedMachine(m)}
           />
         </div>
 
         {/* Main Column: Active Machine Detail View */}
         <div className="xl:col-span-8 2xl:col-span-9">
-          <AssetDetailView
-            machine={selectedMachine}
-            onCreateWorkOrder={() => setIsWorkOrderModalOpen(true)}
-            onScheduleMaintenance={() => setIsWorkOrderModalOpen(true)}
-            onInspectAsset={onInspectAsset}
-          />
+          {selectedMachine ? (
+            <AssetDetailView
+              machine={selectedMachine}
+              onCreateWorkOrder={() => setIsWorkOrderModalOpen(true)}
+              onScheduleMaintenance={() => setIsWorkOrderModalOpen(true)}
+              onInspectAsset={onInspectAsset}
+            />
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-8 flex items-center justify-center min-h-[400px]">
+              <div className="text-center space-y-2">
+                <Wrench className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-sm font-semibold text-slate-500">Select a machine from the queue</p>
+                <p className="text-xs text-slate-400">Loading maintenance data...</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Work Order Creation Modal */}
-      {isWorkOrderModalOpen && (
+      {isWorkOrderModalOpen && selectedMachine && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">

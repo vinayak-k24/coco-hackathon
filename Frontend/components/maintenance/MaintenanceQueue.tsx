@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
   Search,
 } from 'lucide-react';
+import { fetchApi } from '@/lib/api';
 
 export interface MachineQueueItem {
   id: string;
@@ -31,144 +32,7 @@ export interface MachineQueueItem {
   nextDue: string;
 }
 
-export const QUEUE_MACHINES: MachineQueueItem[] = [
-  {
-    id: 'CNC-02',
-    name: 'CNC-02',
-    model: 'DMG Mori NHX 5000',
-    line: 'CNC Line 1',
-    plant: 'Riverside Factory',
-    status: 'critical',
-    issue: 'Spindle Overheat',
-    failureTimeline: 'Failure in 12 hours',
-    healthScore: 96,
-    financialImpact: '$72K impact',
-    image: 'https://picsum.photos/seed/cnc-milling-machine/300/200',
-    age: '4.2 years',
-    criticality: 'High',
-    lastMaintenance: 'Jan 12, 2025',
-    nextDue: 'Apr 30, 2025',
-  },
-  {
-    id: 'Press-07',
-    name: 'Press-07',
-    model: 'Schuler Servo Press 800T',
-    line: 'Stamping Line 2',
-    plant: 'Munich Plant',
-    status: 'warning',
-    issue: 'Hydraulic Pressure Low',
-    failureTimeline: 'Failure in 3 days',
-    healthScore: 87,
-    financialImpact: '$28K impact',
-    image: 'https://picsum.photos/seed/stamping-press-machine/300/200',
-    age: '5.8 years',
-    criticality: 'High',
-    lastMaintenance: 'Nov 04, 2024',
-    nextDue: 'May 15, 2025',
-  },
-  {
-    id: 'Robot-12',
-    name: 'Robot-12',
-    model: 'KUKA KR Quantec 210',
-    line: 'Assembly Line 3',
-    plant: 'Pune Factory',
-    status: 'warning',
-    issue: 'Vibration Anomaly',
-    failureTimeline: 'Failure in 4 days',
-    healthScore: 82,
-    financialImpact: '$18K impact',
-    image: 'https://picsum.photos/seed/kuka-robot-arm/300/200',
-    age: '2.1 years',
-    criticality: 'Medium',
-    lastMaintenance: 'Feb 18, 2025',
-    nextDue: 'May 02, 2025',
-  },
-  {
-    id: 'Conveyor-B3',
-    name: 'Conveyor-B3',
-    model: 'Dorner 3200 Series',
-    line: 'Packaging Transit',
-    plant: 'Riverside Factory',
-    status: 'critical',
-    issue: 'Belt Misalignment',
-    failureTimeline: 'Failure in 5 days',
-    healthScore: 78,
-    financialImpact: '$12K impact',
-    image: 'https://picsum.photos/seed/conveyor-system/300/200',
-    age: '3.4 years',
-    criticality: 'High',
-    lastMaintenance: 'Dec 10, 2024',
-    nextDue: 'May 20, 2025',
-  },
-  {
-    id: 'HVAC-01',
-    name: 'HVAC-01',
-    model: 'Carrier AquaForce 30XW',
-    line: 'Central Utilities',
-    plant: 'Austin Factory',
-    status: 'medium',
-    issue: 'Bearing Wear',
-    failureTimeline: 'Failure in 8 days',
-    healthScore: 71,
-    financialImpact: '$8K impact',
-    image: 'https://picsum.photos/seed/hvac-industrial-chiller/300/200',
-    age: '6.5 years',
-    criticality: 'Medium',
-    lastMaintenance: 'Oct 14, 2024',
-    nextDue: 'Jun 01, 2025',
-  },
-  {
-    id: 'Compressor-04',
-    name: 'Compressor-04',
-    model: 'Atlas Copco GA 90 VSD',
-    line: 'Pneumatics Grid',
-    plant: 'Pune Factory',
-    status: 'medium',
-    issue: 'Temperature Drift',
-    failureTimeline: 'Failure in 9 days',
-    healthScore: 68,
-    financialImpact: '$6K impact',
-    image: 'https://picsum.photos/seed/air-compressor-plant/300/200',
-    age: '3.9 years',
-    criticality: 'Medium',
-    lastMaintenance: 'Jan 28, 2025',
-    nextDue: 'Jun 10, 2025',
-  },
-  {
-    id: 'Chiller-01',
-    name: 'Chiller-01',
-    model: 'Trane Series R Helical',
-    line: 'Cleanroom Cooling',
-    plant: 'Munich Plant',
-    status: 'low',
-    issue: 'Efficiency Drop',
-    failureTimeline: 'Failure in 14 days',
-    healthScore: 64,
-    financialImpact: '$4K impact',
-    image: 'https://picsum.photos/seed/industrial-water-chiller/300/200',
-    age: '7.0 years',
-    criticality: 'Low',
-    lastMaintenance: 'Aug 22, 2024',
-    nextDue: 'Jul 15, 2025',
-  },
-  {
-    id: 'Packaging-03',
-    name: 'Packaging-03',
-    model: 'Bosch Sigpack TTM',
-    line: 'Carton Assembly',
-    plant: 'Austin Factory',
-    status: 'low',
-    issue: 'Motor Current High',
-    failureTimeline: 'Failure in 16 days',
-    healthScore: 62,
-    financialImpact: '$3K impact',
-    image: 'https://picsum.photos/seed/packaging-line-machine/300/200',
-    age: '4.8 years',
-    criticality: 'Low',
-    lastMaintenance: 'Sep 05, 2024',
-    nextDue: 'Jul 28, 2025',
-  },
-];
+export let QUEUE_MACHINES: MachineQueueItem[] = [];
 
 interface MaintenanceQueueProps {
   selectedMachineId: string;
@@ -182,13 +46,31 @@ export default function MaintenanceQueue({
   const [activeTab, setActiveTab] = useState<'priority' | 'upcoming' | 'completed'>('priority');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [sortBy, setSortBy] = useState<'risk' | 'timeline' | 'cost'>('risk');
+  const [machines, setMachines] = useState<MachineQueueItem[]>([]);
 
-  const filtered = QUEUE_MACHINES.filter((m) => {
+  useEffect(() => {
+    const load = () => fetchApi<MachineQueueItem[]>('/api/maintenance/queue?limit=10', []).then((data) => {
+      setMachines(data);
+      QUEUE_MACHINES = data;
+    });
+    load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayMachines = machines.length > 0 ? machines : QUEUE_MACHINES;
+
+  const filtered = displayMachines.filter((m) => {
     if (severityFilter === 'critical') return m.status === 'critical';
     if (severityFilter === 'warning') return m.status === 'warning';
     if (severityFilter === 'info') return m.status === 'medium' || m.status === 'low';
     return true;
   });
+
+  const totalCount = displayMachines.length;
+  const critCount = displayMachines.filter(m => m.status === 'critical').length;
+  const warnCount = displayMachines.filter(m => m.status === 'warning').length;
+  const infoCount = displayMachines.filter(m => m.status === 'medium' || m.status === 'low').length;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col h-full overflow-hidden">
@@ -253,7 +135,7 @@ export default function MaintenanceQueue({
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
             }`}
           >
-            All (12)
+            All ({totalCount})
           </button>
 
           <button
@@ -265,7 +147,7 @@ export default function MaintenanceQueue({
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-            <span>Critical (3)</span>
+            <span>Critical ({critCount})</span>
           </button>
 
           <button
@@ -277,7 +159,7 @@ export default function MaintenanceQueue({
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-            <span>Warning (6)</span>
+            <span>Warning ({warnCount})</span>
           </button>
 
           <button
@@ -289,7 +171,7 @@ export default function MaintenanceQueue({
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span>Info (3)</span>
+            <span>Info ({infoCount})</span>
           </button>
         </div>
 

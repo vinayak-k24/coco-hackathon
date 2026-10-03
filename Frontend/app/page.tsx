@@ -7,14 +7,14 @@ import KpiMetricsRow from '@/components/KpiMetricsRow';
 import PlantHealthOverview, { FactoryPlant, FACTORIES } from '@/components/PlantHealthOverview';
 import ProductionPerformanceChart from '@/components/ProductionPerformanceChart';
 import MaintenanceReadinessCard from '@/components/MaintenanceReadinessCard';
-import TechnicianAvailabilityCard from '@/components/TechnicianAvailabilityCard';
+import WorkforceReadinessCard from '@/components/WorkforceReadinessCard';
 import SupplyChainRiskCard from '@/components/SupplyChainRiskCard';
 import OrderImpactAnalysisCard from '@/components/OrderImpactAnalysisCard';
-import BusinessRevenueImpactCard from '@/components/BusinessRevenueImpactCard';
+import BusinessImpactSection from '@/components/BusinessImpactSection';
 import CriticalMachineAlerts, { MachineAlert, MACHINE_ALERTS } from '@/components/CriticalMachineAlerts';
 import NexaCopilotFloatingAgent from '@/components/NexaCopilotFloatingAgent';
 import LiveActivityStream from '@/components/LiveActivityStream';
-import ProactiveInsightsCard from '@/components/ProactiveInsightsCard';
+import RecommendedActionsPanel from '@/components/RecommendedActionsPanel';
 import EnergyTelemetryCard from '@/components/EnergyTelemetryCard';
 import MaintenanceHub from '@/components/maintenance/MaintenanceHub';
 import Asset360View from '@/components/asset/Asset360View';
@@ -32,19 +32,7 @@ import {
   CommandSearchModal,
 } from '@/components/Modals';
 import {
-  Box,
-  Activity,
-  Wrench,
-  Link2,
-  DollarSign,
-  Users2,
-  Sparkles,
-  BarChart3,
-  Settings,
   ArrowLeft,
-  Gauge,
-  Eye,
-  Sliders,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -136,142 +124,30 @@ export default function DashboardPage() {
               isPlayingBrief={isPlayingBrief}
             />
 
-            {/* Quick Navigation Strip to All Subsystems */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 text-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0 mr-1">
-                Subsystems:
-              </span>
-              <button
-                onClick={() => setActiveTab('what-if-lab')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Sliders className="w-3.5 h-3.5 text-blue-600" />
-                <span>What-If Lab</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('vision-center')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Vision Center</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('insights')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200/80 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
-                <span>Insights & Prediction Lab</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('executive')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Users2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Executive Briefing</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('finance')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <DollarSign className="w-3.5 h-3.5 text-slate-500" />
-                <span>Finance & ROI</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('supply-chain')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Link2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Supply Chain</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('maintenance')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Wrench className="w-3.5 h-3.5 text-slate-500" />
-                <span>Maintenance Hub</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('asset-360')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 shadow-2xs transition-colors shrink-0 cursor-pointer"
-              >
-                <Gauge className="w-3.5 h-3.5 text-slate-500" />
-                <span>Asset 360</span>
-              </button>
-            </div>
-
-            {/* 7 KPI Metrics Row */}
+            {/* KPI Metrics Strip */}
             <KpiMetricsRow onCardClick={handleCardClick} />
 
-            {/* Main Content Layout Grid: Left (72%) + Right (28%) */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-              {/* Left Column (8 cols on xl / 72%) */}
-              <div className="xl:col-span-8 space-y-5">
-                {/* Plant Health Overview (4 Factories) */}
-                <PlantHealthOverview onSelectFactory={(f) => setSelectedFactory(f)} />
-
-                {/* Middle Row (Production Performance + Maintenance + Workforce) */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* Production Performance: 6 cols */}
-                  <div className="md:col-span-6 flex">
-                    <div className="w-full">
-                      <ProductionPerformanceChart />
-                    </div>
-                  </div>
-
-                  {/* Maintenance Readiness: 3 cols */}
-                  <div className="md:col-span-3 flex">
-                    <div className="w-full">
-                      <MaintenanceReadinessCard
-                        onViewPlan={() => setActiveTab('maintenance')}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Technician Availability: 3 cols */}
-                  <div className="md:col-span-3 flex">
-                    <div className="w-full">
-                      <TechnicianAvailabilityCard
-                        onManageWorkforce={() => setIsActionPlanOpen(true)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Row (Supply Chain + Order Impact + Business & Revenue) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <SupplyChainRiskCard onViewAll={() => setActiveTab('supply-chain')} />
-                  <OrderImpactAnalysisCard
-                    onSelectOrder={() => setIsRecommendationsOpen(true)}
-                  />
-                  <BusinessRevenueImpactCard onViewFinance={() => setActiveTab('finance')} />
-                </div>
-              </div>
-
-              {/* Right Column (4 cols on xl / 28%) */}
-              <div className="xl:col-span-4 space-y-5 flex flex-col">
-                {/* Critical Machine Alerts */}
-                <CriticalMachineAlerts
-                  onSelectAlert={(a) => {
-                    setSelectedAssetId(a.machine || 'CNC-02');
-                    setActiveTab('asset-360');
-                  }}
-                  onViewAll={() => setActiveTab('maintenance')}
-                />
-
-                {/* Proactive Operational Insights Card */}
-                <ProactiveInsightsCard
-                  onCreateActionPlan={() => setIsActionPlanOpen(true)}
-                  onOpenCopilot={() => setIsCopilotOpen(true)}
-                  onNavigateToInsights={() => setActiveTab('insights')}
-                />
-
-                {/* Real-Time SCADA Event Stream */}
-                <LiveActivityStream />
-
-                {/* Plant Energy & Sustainability Telemetry */}
-                <EnergyTelemetryCard />
-              </div>
+            {/* Section 2: Plant Network (65%) + Recommended Actions (35%) — equal height */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-5 items-stretch mb-5" style={{ minHeight: 330 }}>
+              <PlantHealthOverview onSelectFactory={(f) => setSelectedFactory(f)} />
+              <RecommendedActionsPanel onViewAll={() => setIsRecommendationsOpen(true)} />
             </div>
+
+            {/* Section 3: Row 1 — Production (48%) + Maintenance (24%) + Workforce (28%) */}
+            <div className="grid gap-3.5 mb-3.5" style={{ gridTemplateColumns: 'minmax(0,1.9fr) minmax(0,0.9fr) minmax(0,1fr)', height: 260 }}>
+              <div className="min-w-0 overflow-hidden"><ProductionPerformanceChart /></div>
+              <div className="min-w-0 overflow-hidden"><MaintenanceReadinessCard onViewPlan={() => setActiveTab('maintenance')} /></div>
+              <div className="min-w-0 overflow-hidden"><WorkforceReadinessCard onManageWorkforce={() => setIsActionPlanOpen(true)} /></div>
+            </div>
+
+            {/* Section 3: Row 2 — Supply Chain (58%) + Order Impact (42%) */}
+            <div className="grid gap-3.5" style={{ gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', height: 278 }}>
+              <div className="min-w-0 overflow-hidden"><SupplyChainRiskCard onViewAll={() => setActiveTab('supply-chain')} /></div>
+              <div className="min-w-0 overflow-hidden"><OrderImpactAnalysisCard onSelectOrder={() => setIsRecommendationsOpen(true)} /></div>
+            </div>
+
+            {/* Section 4: Business Impact */}
+            <BusinessImpactSection onViewDetails={() => setActiveTab('finance')} />
           </>
         ) : activeTab === 'maintenance' ? (
           /* Maintenance Intelligence Hub View */
