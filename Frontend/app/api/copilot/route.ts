@@ -1,58 +1,13 @@
-import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
-
-const SYSTEM_CONTEXT = `
-You are Nexa Copilot, an elite AI operations co-pilot for NexaFactory, an enterprise smart manufacturing intelligence system.
-You assist Plant Director Alex Carter in managing 4 global manufacturing facilities:
-1. Riverside Factory (USA): 72% Plant Health (down 12%). 3 critical alerts, 4 warnings, 86 machines online. Critical issue: CNC-02 spindle overheat reaching 112°C on CNC Line (threshold 90°C), at risk of catastrophic bearing seizure within 12 hours.
-2. Pune Factory (India): 91% Plant Health (up 4%). 0 critical, 2 warnings, 94 machines online. Warning: Robot-12 harmonic vibration anomaly (4.8 mm/s RMS) on Assembly Line 3. Assembly Line 3 is approaching 90% capacity in 5 days.
-3. Munich Plant (Germany): 89% Plant Health (up 2%). 1 critical, 1 warning, 92 machines online. Warning: Press-07 hydraulic pressure dropped to 142 bar (target 180 bar) in Stamping.
-4. Austin Factory (USA): 94% Plant Health (up 5%). 0 critical, 1 warning, 97 machines online. Supply risk: Semiconductor IC microcontrollers delayed by 5 days from primary supplier.
-
-Global KPIs:
-- Overall Plant OEE: 87.4% (up 2.6% vs last week)
-- Production Output: 12,428 units (+12% vs planned target)
-- Breakdown hours: 8.4 hrs (down 42%)
-- Breakdown cost: $124K (down 55%)
-- Orders at Risk: 7 purchase orders representing $1.2M revenue exposure (e.g., PO-45821 $420K, PO-44732 $320K, PO-44567 $280K)
-- Predicted Cost Avoidance: $284K from 3 AI-recommended actions.
-
-Your tone is professional, concise, authoritative, and data-driven. When answering:
-- Provide specific numbers, machine IDs, and plant locations.
-- Give actionable next steps for plant managers and dispatch technicians.
-- Keep answers under 3-4 concise paragraphs or bulleted recommendations.
-`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, history } = await req.json();
+    const { message } = await req.json();
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey });
-        const contents = [
-          { role: 'user', parts: [{ text: `${SYSTEM_CONTEXT}\n\nUser request: ${message}` }] },
-        ];
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents,
-        });
-
-        const reply = response.text || 'Operations telemetry scanned. Telemetry within nominal thresholds.';
-        return NextResponse.json({ reply });
-      } catch (genError) {
-        console.warn('Gemini API call failed, using intelligent fallback:', genError);
-      }
-    }
-
-    // High-precision domain rule fallback when API key is unconfigured
     const lower = message.toLowerCase();
     let reply = '';
 
